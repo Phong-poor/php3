@@ -1,7 +1,12 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
+import MainLayout from './components/Layout/MainLayout.vue'
 </script>
 
 <template>
-  <HelloWorld />
+  <MainLayout />
 </template>
+<style>
+  body{
+    margin: 0;
+  }
+</style>
