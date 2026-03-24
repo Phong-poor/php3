@@ -2,7 +2,19 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import Header from '../Layout/Header.vue'
 import Footer from '../Layout/Footer.vue'
+import GiftPopup from './GiftPopup.vue'
 
+// ── Popup ──────────────────────────────────────────────────
+const showGift = ref(false)
+
+onMounted(() => {
+    // Hiện popup sau 8 giây khi vào trang Home
+    setTimeout(() => {
+        showGift.value = true
+    }, 10000)
+})
+
+// ── Slides ─────────────────────────────────────────────────
 const slides = [
     {
         eyebrow: 'PREMIUM LAPTOP STORE 2026',
@@ -80,26 +92,10 @@ const featuredProducts = [
 ]
 
 const benefits = [
-    {
-        icon: '✔️',
-        title: '100% chính hãng',
-        desc: 'Cam kết sản phẩm mới, nguyên seal, đầy đủ chứng từ.'
-    },
-    {
-        icon: '🛡️',
-        title: 'Bảo hành toàn diện',
-        desc: 'Hỗ trợ bảo hành nhanh, chính sách đổi trả rõ ràng.'
-    },
-    {
-        icon: '💳',
-        title: 'Trả góp linh hoạt',
-        desc: 'Trả góp 0%, hồ sơ đơn giản, duyệt nhanh chóng.'
-    },
-    {
-        icon: '🚚',
-        title: 'Giao hàng toàn quốc',
-        desc: 'Đóng gói an toàn, giao nhanh, hỗ trợ kiểm tra hàng.'
-    }
+    { icon: '✔️', title: '100% chính hãng', desc: 'Cam kết sản phẩm mới, nguyên seal, đầy đủ chứng từ.' },
+    { icon: '🛡️', title: 'Bảo hành toàn diện', desc: 'Hỗ trợ bảo hành nhanh, chính sách đổi trả rõ ràng.' },
+    { icon: '💳', title: 'Trả góp linh hoạt', desc: 'Trả góp 0%, hồ sơ đơn giản, duyệt nhanh chóng.' },
+    { icon: '🚚', title: 'Giao hàng toàn quốc', desc: 'Đóng gói an toàn, giao nhanh, hỗ trợ kiểm tra hàng.' }
 ]
 
 const news = [
@@ -125,20 +121,17 @@ const news = [
 
 const reviews = [
     {
-        name: 'Trần Minh Quân',
-        role: 'Creative Designer',
+        name: 'Trần Minh Quân', role: 'Creative Designer',
         content: 'Website đẹp, mua hàng dễ, tư vấn đúng nhu cầu. Máy nhận được đúng như mong đợi.',
         avatar: 'https://randomuser.me/api/portraits/men/32.jpg'
     },
     {
-        name: 'Nguyễn Phương Anh',
-        role: 'Marketing Manager',
+        name: 'Nguyễn Phương Anh', role: 'Marketing Manager',
         content: 'Mình rất thích cách trình bày sản phẩm và trải nghiệm đặt hàng. Nhìn cực kỳ cao cấp.',
         avatar: 'https://randomuser.me/api/portraits/women/44.jpg'
     },
     {
-        name: 'Lê Hoàng Nam',
-        role: 'Pro Gamer',
+        name: 'Lê Hoàng Nam', role: 'Pro Gamer',
         content: 'Laptop mạnh, giá tốt, giao hàng nhanh. Phần gaming nhìn rất chuyên nghiệp.',
         avatar: 'https://randomuser.me/api/portraits/men/52.jpg'
     }
@@ -154,22 +147,10 @@ const stats = [
 const current = ref(0)
 let interval = null
 
-const nextSlide = () => {
-    current.value = (current.value + 1) % slides.length
-}
-
-const prevSlide = () => {
-    current.value = (current.value - 1 + slides.length) % slides.length
-}
-
-const start = () => {
-    stop()
-    interval = setInterval(nextSlide, 5000)
-}
-
-const stop = () => {
-    if (interval) clearInterval(interval)
-}
+const nextSlide = () => { current.value = (current.value + 1) % slides.length }
+const prevSlide = () => { current.value = (current.value - 1 + slides.length) % slides.length }
+const start = () => { stop(); interval = setInterval(nextSlide, 5000) }
+const stop = () => { if (interval) clearInterval(interval) }
 
 onMounted(start)
 onUnmounted(stop)
@@ -178,75 +159,48 @@ onUnmounted(stop)
 <template>
     <Header />
 
+    <GiftPopup v-if="showGift" :delay="0" />
+
     <main class="home">
         <!-- HERO -->
         <section class="hero" @mouseenter="stop" @mouseleave="start">
             <div class="hero-bg"></div>
-
             <div class="container hero-inner">
                 <transition name="fade-slide" mode="out-in">
                     <div class="hero-content" :key="current">
                         <div class="hero-left">
                             <span class="hero-eyebrow">{{ slides[current].eyebrow }}</span>
-
                             <h1>
                                 {{ slides[current].title }}
                                 <span>{{ slides[current].highlight }}</span>
                             </h1>
-
                             <p>{{ slides[current].desc }}</p>
-
                             <div class="hero-actions">
                                 <button class="btn btn-primary">{{ slides[current].primary }}</button>
                                 <button class="btn btn-secondary">{{ slides[current].secondary }}</button>
                             </div>
-
                             <div class="hero-metrics">
-                                <div class="metric">
-                                    <strong>Miễn phí</strong>
-                                    <span>giao hàng toàn quốc</span>
-                                </div>
-                                <div class="metric">
-                                    <strong>0%</strong>
-                                    <span>trả góp linh hoạt</span>
-                                </div>
-                                <div class="metric">
-                                    <strong>24 tháng</strong>
-                                    <span>bảo hành uy tín</span>
-                                </div>
+                                <div class="metric"><strong>Miễn phí</strong><span>giao hàng toàn quốc</span></div>
+                                <div class="metric"><strong>0%</strong><span>trả góp linh hoạt</span></div>
+                                <div class="metric"><strong>24 tháng</strong><span>bảo hành uy tín</span></div>
                             </div>
                         </div>
-
                         <div class="hero-right">
                             <div class="hero-image-card">
                                 <img :src="slides[current].img" :alt="slides[current].title" />
                             </div>
-
-                            <div class="floating-card top">
-                                <span>🔥 Xu hướng</span>
-                                <strong>Laptop AI 2026</strong>
-                            </div>
-
-                            <div class="floating-card bottom">
-                                <span>⚡ Deal nổi bật</span>
-                                <strong>Giảm đến 20%</strong>
+                            <div class="floating-card top"><span>🔥 Xu hướng</span><strong>Laptop AI 2026</strong></div>
+                            <div class="floating-card bottom"><span>⚡ Deal nổi bật</span><strong>Giảm đến 20%</strong>
                             </div>
                         </div>
                     </div>
                 </transition>
-
                 <div class="hero-controls">
                     <button class="nav-btn" @click="prevSlide">‹</button>
-
                     <div class="dots">
-                        <span
-                            v-for="(slide, i) in slides"
-                            :key="i"
-                            :class="{ active: i === current }"
-                            @click="current = i"
-                        ></span>
+                        <span v-for="(slide, i) in slides" :key="i" :class="{ active: i === current }"
+                            @click="current = i"></span>
                     </div>
-
                     <button class="nav-btn" @click="nextSlide">›</button>
                 </div>
             </div>
@@ -273,7 +227,6 @@ onUnmounted(stop)
                     </div>
                     <a href="#" class="section-link">Xem tất cả</a>
                 </div>
-
                 <div class="category-grid">
                     <div class="category-card" v-for="(c, i) in categories" :key="i">
                         <div class="category-icon">{{ c.icon }}</div>
@@ -295,28 +248,20 @@ onUnmounted(stop)
                         <p>Chọn lọc từ các dòng máy bán chạy với hiệu năng tốt, thiết kế đẹp và giá trị cao.</p>
                     </div>
                 </div>
-
                 <div class="product-grid">
                     <article class="product-card" v-for="(p, i) in featuredProducts" :key="i">
                         <span class="product-badge" v-if="p.badge">{{ p.badge }}</span>
-
-                        <div class="product-thumb">
-                            <img :src="p.img" :alt="p.name" />
-                        </div>
-
+                        <div class="product-thumb"><img :src="p.img" :alt="p.name" /></div>
                         <div class="product-body">
                             <span class="product-category">{{ p.category }}</span>
                             <h3>{{ p.name }}</h3>
-
                             <ul class="specs">
                                 <li v-for="(spec, index) in p.specs" :key="index">{{ spec }}</li>
                             </ul>
-
                             <div class="price-row">
                                 <strong>{{ p.price }}</strong>
                                 <span>{{ p.old }}</span>
                             </div>
-
                             <div class="product-actions">
                                 <button class="btn btn-primary small">Mua ngay</button>
                                 <button class="btn btn-secondary small">Chi tiết</button>
@@ -333,12 +278,9 @@ onUnmounted(stop)
                 <div class="promo-text">
                     <span class="section-label light">ƯU ĐÃI ĐẶC BIỆT</span>
                     <h2>Nâng cấp trải nghiệm làm việc và giải trí ngay hôm nay</h2>
-                    <p>
-                        Giảm giá trực tiếp, hỗ trợ trả góp, quà tặng đi kèm và dịch vụ kỹ thuật tận tâm
-                        cho mọi đơn hàng laptop cao cấp.
-                    </p>
+                    <p>Giảm giá trực tiếp, hỗ trợ trả góp, quà tặng đi kèm và dịch vụ kỹ thuật tận tâm cho mọi đơn hàng
+                        laptop cao cấp.</p>
                 </div>
-
                 <div class="promo-actions">
                     <button class="btn btn-light">Nhận ưu đãi</button>
                     <button class="btn btn-outline-light">Liên hệ tư vấn</button>
@@ -355,7 +297,6 @@ onUnmounted(stop)
                         <h2>Dịch vụ xứng tầm một hệ thống bán laptop chuyên nghiệp</h2>
                     </div>
                 </div>
-
                 <div class="benefits-grid">
                     <div class="benefit-card" v-for="(b, i) in benefits" :key="i">
                         <div class="benefit-icon">{{ b.icon }}</div>
@@ -377,12 +318,9 @@ onUnmounted(stop)
                     </div>
                     <a href="#" class="section-link">Xem thêm</a>
                 </div>
-
                 <div class="news-grid">
                     <article class="news-card" v-for="(n, i) in news" :key="i">
-                        <div class="news-thumb">
-                            <img :src="n.img" :alt="n.title" />
-                        </div>
+                        <div class="news-thumb"><img :src="n.img" :alt="n.title" /></div>
                         <div class="news-body">
                             <span class="news-tag">{{ n.tag }}</span>
                             <h3>{{ n.title }}</h3>
@@ -404,18 +342,13 @@ onUnmounted(stop)
                         <p>Trải nghiệm mua sắm cao cấp, tư vấn tận tâm và dịch vụ hậu mãi chuyên nghiệp.</p>
                     </div>
                 </div>
-
                 <div class="review-grid">
                     <article class="review-card" v-for="(r, i) in reviews" :key="i">
                         <div class="stars">★★★★★</div>
-                        <p class="review-content">“{{ r.content }}”</p>
-
+                        <p class="review-content">"{{ r.content }}"</p>
                         <div class="review-user">
                             <img :src="r.avatar" :alt="r.name" />
-                            <div>
-                                <strong>{{ r.name }}</strong>
-                                <span>{{ r.role }}</span>
-                            </div>
+                            <div><strong>{{ r.name }}</strong><span>{{ r.role }}</span></div>
                         </div>
                     </article>
                 </div>
@@ -429,7 +362,6 @@ onUnmounted(stop)
                     <span class="section-label light">SẴN SÀNG NÂNG CẤP?</span>
                     <h2>Tìm chiếc laptop hoàn hảo cho công việc và phong cách của bạn</h2>
                 </div>
-
                 <div class="cta-actions">
                     <button class="btn btn-light">Xem sản phẩm</button>
                     <button class="btn btn-outline-light">Tư vấn miễn phí</button>
@@ -442,6 +374,7 @@ onUnmounted(stop)
 </template>
 
 <style scoped>
+/* === giữ nguyên toàn bộ style gốc === */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 * {
@@ -450,10 +383,7 @@ onUnmounted(stop)
 
 .home {
     font-family: 'Inter', sans-serif;
-    background:
-        radial-gradient(circle at top left, rgba(99, 102, 241, 0.12), transparent 28%),
-        radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 24%),
-        linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+    background: radial-gradient(circle at top left, rgba(99, 102, 241, 0.12), transparent 28%), radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 24%), linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
     color: #0f172a;
 }
 
@@ -578,7 +508,6 @@ onUnmounted(stop)
     font-size: 13px;
 }
 
-/* HERO */
 .hero {
     position: relative;
     min-height: 100vh;
@@ -591,10 +520,7 @@ onUnmounted(stop)
 .hero-bg {
     position: absolute;
     inset: 0;
-    background:
-        radial-gradient(circle at 20% 20%, rgba(79, 70, 229, 0.18), transparent 22%),
-        radial-gradient(circle at 80% 30%, rgba(37, 99, 235, 0.16), transparent 24%),
-        linear-gradient(135deg, #f8fbff 0%, #edf2ff 45%, #eef2ff 100%);
+    background: radial-gradient(circle at 20% 20%, rgba(79, 70, 229, 0.18), transparent 22%), radial-gradient(circle at 80% 30%, rgba(37, 99, 235, 0.16), transparent 24%), linear-gradient(135deg, #f8fbff 0%, #edf2ff 45%, #eef2ff 100%);
 }
 
 .hero-inner {
@@ -786,7 +712,6 @@ onUnmounted(stop)
     background: linear-gradient(135deg, #2563eb, #4f46e5);
 }
 
-/* STATS */
 .stats {
     margin-top: -10px;
     padding-bottom: 20px;
@@ -820,7 +745,6 @@ onUnmounted(stop)
     font-size: 14px;
 }
 
-/* CATEGORY */
 .category-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -871,7 +795,6 @@ onUnmounted(stop)
     font-weight: 700;
 }
 
-/* PRODUCTS */
 .featured-section {
     padding-top: 40px;
 }
@@ -998,7 +921,6 @@ onUnmounted(stop)
     flex: 1;
 }
 
-/* PROMO */
 .promo {
     padding: 20px 0 10px;
 }
@@ -1028,7 +950,6 @@ onUnmounted(stop)
     gap: 14px;
 }
 
-/* BENEFITS */
 .benefits-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -1067,7 +988,6 @@ onUnmounted(stop)
     font-size: 14px;
 }
 
-/* NEWS */
 .news-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1126,7 +1046,6 @@ onUnmounted(stop)
     font-weight: 700;
 }
 
-/* REVIEWS */
 .review-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1180,12 +1099,10 @@ onUnmounted(stop)
     font-size: 13px;
 }
 
-/* CTA */
 .cta {
     padding: 10px 0 90px;
 }
 
-/* TRANSITION */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
     transition: all 0.5s ease;
@@ -1201,8 +1118,8 @@ onUnmounted(stop)
     transform: translateY(-18px);
 }
 
-/* RESPONSIVE */
 @media (max-width: 1100px) {
+
     .hero-content,
     .stats-grid,
     .category-grid,
