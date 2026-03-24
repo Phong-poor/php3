@@ -1,4 +1,52 @@
 <script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+const showWishlist = ref(false)
+const showUser = ref(false)
+
+const toggleWishlist = () => {
+  showWishlist.value = !showWishlist.value
+  if (showWishlist.value) showUser.value = false
+}
+
+const toggleUser = () => {
+  showUser.value = !showUser.value
+  if (showUser.value) showWishlist.value = false
+}
+
+const handleOutside = (e) => {
+  if (!e.target.closest('.dropdown-wrap')) {
+    showWishlist.value = false
+    showUser.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', handleOutside))
+onUnmounted(() => document.removeEventListener('click', handleOutside))
+
+const wishlistItems = ref([
+  { id: 1, name: 'VinaBook Pro X14', price: '36.990.000đ', img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200' },
+  { id: 2, name: 'Zephyrus Titan 16', price: '62.990.000đ', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200' },
+  { id: 3, name: 'Creator Studio 15', price: '48.490.000đ', img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=200' },
+])
+
+const removeWishlist = (id) => {
+  wishlistItems.value = wishlistItems.value.filter(i => i.id !== id)
+}
+
+const user = ref({
+  name: 'Nguyễn Văn A',
+  email: 'nguyenvana@email.com',
+  avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+  memberSince: 'Elite 2026'
+})
+
+const logout = () => {
+  showUser.value = false
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -11,16 +59,17 @@
       <div class="topbar-right">
         <span class="topbar-item">
           <svg viewBox="0 0 24 24" fill="none">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.08 6.08l.95-.95a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+            <path
+              d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.08 6.08l.95-.95a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
           </svg>
           1800 9999
         </span>
         <span class="topbar-divider">|</span>
         <span class="topbar-item">
           <svg viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 2a14.5 14.5 0 0 1 0 20A14.5 14.5 0 0 1 12 2"/>
-            <path d="M2 12h20"/>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 2a14.5 14.5 0 0 1 0 20A14.5 14.5 0 0 1 12 2" />
+            <path d="M2 12h20" />
           </svg>
           Việt Nam | VNĐ
         </span>
@@ -58,40 +107,123 @@
           </svg>
         </div>
 
-        <!-- WISHLIST -->
-        <router-link to="/wishlist" class="icon-btn">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-          </svg>
-          <span class="badge badge-red">0</span>
-        </router-link>
+        <!-- WISHLIST DROPDOWN -->
+        <div class="dropdown-wrap">
+          <button class="icon-btn" @click.stop="toggleWishlist" :class="{ active: showWishlist }">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path
+                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </svg>
+            <span class="badge badge-red">{{ wishlistItems.length }}</span>
+          </button>
+
+          <transition name="drop">
+            <div class="dropdown wishlist-drop" v-if="showWishlist">
+              <div class="drop-header">
+                <span class="drop-title">Yêu thích</span>
+                <span class="drop-count">{{ wishlistItems.length }} sản phẩm</span>
+              </div>
+              <div class="drop-body">
+                <div v-if="wishlistItems.length === 0" class="drop-empty">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  <p>Chưa có sản phẩm yêu thích</p>
+                </div>
+                <div class="wish-item" v-for="item in wishlistItems" :key="item.id">
+                  <img :src="item.img" :alt="item.name" />
+                  <div class="wish-info">
+                    <p class="wish-name">{{ item.name }}</p>
+                    <p class="wish-price">{{ item.price }}</p>
+                  </div>
+                  <button class="wish-remove" @click="removeWishlist(item.id)" title="Xóa">
+                    <svg viewBox="0 0 24 24" fill="none">
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="drop-footer" v-if="wishlistItems.length > 0">
+                <router-link to="/wishlist" class="drop-action-btn" @click="showWishlist = false">Xem tất
+                  cả</router-link>
+              </div>
+            </div>
+          </transition>
+        </div>
 
         <!-- CART -->
-        <router-link to="/cart" class="icon-btn">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M6 6h15l-1.5 9h-13z" />
-            <circle cx="9" cy="20" r="1" />
-            <circle cx="18" cy="20" r="1" />
-          </svg>
-          <span class="badge badge-blue">3</span>
-        </router-link>
+        <div class="icon-btn-wrap">
+          <router-link to="/cart" class="icon-btn">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M6 6h15l-1.5 9h-13z" />
+              <circle cx="9" cy="20" r="1" />
+              <circle cx="18" cy="20" r="1" />
+            </svg>
+          </router-link>
+          <span class="badge badge-blue badge-float">3</span>
+        </div>
 
-        <!-- USER -->
-        <router-link to="/profile" class="icon-btn icon-btn-user">
-          <svg viewBox="0 0 24 24" fill="none">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        </router-link>
+        <!-- USER DROPDOWN -->
+        <div class="dropdown-wrap">
+          <div class="icon-btn-wrap">
+            <button class="icon-btn icon-btn-user" @click.stop="toggleUser" :class="{ active: showUser }">
+              <img v-if="user.avatar" :src="user.avatar" class="avatar-img" :alt="user.name" />
+              <svg v-else viewBox="0 0 24 24" fill="none">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </button>
+          </div>
+
+          <transition name="drop">
+            <div class="dropdown user-drop" v-if="showUser">
+              <div class="user-profile-card">
+                <img :src="user.avatar" :alt="user.name" class="user-avatar" />
+                <div class="user-info">
+                  <p class="user-name">{{ user.name }}</p>
+                  <p class="user-email">{{ user.email }}</p>
+                  <span class="user-badge">{{ user.memberSince }}</span>
+                </div>
+              </div>
+              <div class="drop-divider"></div>
+              <ul class="user-menu">
+                <li>
+                  <router-link to="/profile" @click="showUser = false">
+                    <span class="menu-icon"><svg viewBox="0 0 24 24" fill="none">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg></span>
+                    <span>Thông tin cá nhân</span>
+                    <svg class="menu-arrow" viewBox="0 0 24 24" fill="none">
+                      <path d="m9 18 6-6-6-6" />
+                    </svg>
+                  </router-link>
+                </li>
+                
+              </ul>
+              <div class="drop-divider"></div>
+              <div class="drop-footer-user">
+                <button class="logout-btn" @click="logout">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Đăng xuất
+                </button>
+              </div>
+            </div>
+          </transition>
+        </div>
 
       </div>
-
     </div>
   </header>
 </template>
 
 <style scoped>
-/* ───────────────────────────── TOP BAR ───────────────────────────── */
+/* ── TOP BAR ─────────────────────────────────────────────── */
 .topbar {
   background: #0f172a;
   color: #cbd5e1;
@@ -155,14 +287,14 @@
   color: #334155;
 }
 
-/* ───────────────────────────── MAIN HEADER ───────────────────────────── */
+/* ── MAIN HEADER ─────────────────────────────────────────── */
 .header {
-  background: #ffffff;
+  background: #fff;
   border-bottom: 1px solid #e5e7eb;
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.05);
 }
 
 .container {
@@ -271,10 +403,15 @@
   height: 15px;
   stroke: #94a3b8;
   stroke-width: 2;
-  flex-shrink: 0;
 }
 
-/* ICON BTN */
+/* ── ICON BTN WRAPPER — badge floats outside ── */
+.icon-btn-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* ICON BTN — NO overflow:hidden so badge is visible */
 .icon-btn {
   width: 38px;
   height: 38px;
@@ -284,14 +421,20 @@
   justify-content: center;
   background: #f1f5f9;
   cursor: pointer;
-  position: relative;
-  transition: background 0.2s, transform 0.15s;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
   text-decoration: none;
+  border: none;
+  /* overflow:hidden REMOVED — this was hiding the badges */
 }
 
 .icon-btn:hover {
   background: #e2e8f0;
   transform: translateY(-1px);
+}
+
+.icon-btn.active {
+  background: #dbeafe;
+  box-shadow: 0 0 0 2px #2563eb;
 }
 
 .icon-btn svg {
@@ -304,31 +447,58 @@
 
 .icon-btn-user {
   background: #2563eb;
+  padding: 0;
 }
 
 .icon-btn-user svg {
-  stroke: #ffffff;
+  stroke: #fff;
 }
 
 .icon-btn-user:hover {
   background: #1d4ed8;
 }
 
-/* BADGE */
+.icon-btn-user.active {
+  box-shadow: 0 0 0 2px #93c5fd;
+}
+
+.avatar-img {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+/* BADGE — now floats via icon-btn-wrap */
 .badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
   height: 18px;
-  color: white;
+  padding: 0 4px;
+  color: #fff;
   font-size: 10px;
   font-weight: 700;
-  border-radius: 50%;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 2px solid #fff;
+  line-height: 1;
+  z-index: 10;
+}
+
+/* For wishlist badge — sits inside .icon-btn but btn no longer clips it */
+.icon-btn .badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+}
+
+.badge-float {
+  /* for cart wrapper */
 }
 
 .badge-blue {
@@ -337,5 +507,370 @@
 
 .badge-red {
   background: #ef4444;
+}
+
+/* ── DROPDOWN WRAPPER ────────────────────────────────────── */
+.dropdown-wrap {
+  position: relative;
+}
+
+/* ── DROPDOWN BASE ───────────────────────────────────────── */
+.dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.14), 0 4px 16px rgba(15, 23, 42, 0.06);
+  border: 1px solid #f1f5f9;
+  z-index: 2000;
+  overflow: hidden;
+}
+
+.dropdown::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: 14px;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 1px solid #f1f5f9;
+  border-bottom: none;
+  border-right: none;
+  transform: rotate(45deg);
+}
+
+/* ── WISHLIST DROPDOWN ───────────────────────────────────── */
+.wishlist-drop {
+  width: 320px;
+}
+
+.drop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.drop-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.drop-count {
+  font-size: 12px;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.drop-body {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.drop-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.drop-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.drop-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 0;
+  color: #94a3b8;
+}
+
+.drop-empty svg {
+  width: 40px;
+  height: 40px;
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.drop-empty p {
+  font-size: 13px;
+}
+
+.wish-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  transition: background 0.15s;
+}
+
+.wish-item:hover {
+  background: #f8fafc;
+}
+
+.wish-item img {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.wish-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.wish-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0 0 3px;
+}
+
+.wish-price {
+  font-size: 12px;
+  color: #2563eb;
+  font-weight: 600;
+  margin: 0;
+}
+
+.wish-remove {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.wish-remove:hover {
+  background: #fee2e2;
+}
+
+.wish-remove svg {
+  width: 14px;
+  height: 14px;
+  stroke: #ef4444;
+  stroke-width: 2.5;
+}
+
+.drop-footer {
+  padding: 12px 18px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.drop-action-btn {
+  display: block;
+  text-align: center;
+  padding: 9px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.drop-action-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* ── USER DROPDOWN ───────────────────────────────────────── */
+.user-drop {
+  width: 280px;
+}
+
+.user-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+}
+
+.user-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #dbeafe;
+  flex-shrink: 0;
+}
+
+.user-info {
+  min-width: 0;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 2px;
+}
+
+.user-email {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #dbeafe;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+}
+
+.drop-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0;
+}
+
+.user-menu {
+  list-style: none;
+  padding: 6px 0;
+  margin: 0;
+}
+
+.user-menu li a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  text-decoration: none;
+  color: #374151;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.user-menu li a:hover {
+  background: #f8fafc;
+  color: #2563eb;
+}
+
+.user-menu li a:hover .menu-icon {
+  background: #dbeafe;
+}
+
+.user-menu li a:hover .menu-icon svg {
+  stroke: #2563eb;
+}
+
+.menu-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.menu-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: #64748b;
+  stroke-width: 1.8;
+  fill: none;
+  transition: stroke 0.15s;
+}
+
+.menu-arrow {
+  width: 14px;
+  height: 14px;
+  stroke: #cbd5e1;
+  stroke-width: 2;
+  fill: none;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.user-menu li a:hover .menu-arrow {
+  stroke: #2563eb;
+}
+
+.drop-footer-user {
+  padding: 12px 18px;
+}
+
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+.logout-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.logout-btn svg {
+  width: 16px;
+  height: 16px;
+  stroke: #fff;
+  stroke-width: 2;
+  fill: none;
+}
+
+/* ── TRANSITION ──────────────────────────────────────────── */
+.drop-enter-active {
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.drop-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.drop-enter-from {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.97);
+}
+
+.drop-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.97);
 }
 </style>
