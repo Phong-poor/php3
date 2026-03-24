@@ -42,7 +42,7 @@ const format = (n) => n.toLocaleString('vi-VN') + 'đ'
 
 <template>
 
-<Header />
+  <Header />
 
   <div class="checkout-page">
     <div class="container">
@@ -68,10 +68,7 @@ const format = (n) => n.toLocaleString('vi-VN') + 'đ'
 
           <input v-model="form.email" placeholder="Email" />
 
-          <textarea
-            v-model="form.address"
-            placeholder="Địa chỉ nhận hàng"
-          ></textarea>
+          <textarea v-model="form.address" placeholder="Địa chỉ nhận hàng"></textarea>
         </div>
 
         <!-- PAYMENT -->
@@ -166,7 +163,7 @@ const format = (n) => n.toLocaleString('vi-VN') + 'đ'
     </div>
   </div>
 
-<Footer />
+  <Footer />
 
 </template>
 
@@ -251,7 +248,7 @@ textarea {
   font-size: 14px;
   box-sizing: border-box;
 
-  margin-top: 10px;    
+  margin-top: 10px;
   resize: none;
 }
 

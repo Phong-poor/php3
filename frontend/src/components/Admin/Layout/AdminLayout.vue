@@ -103,16 +103,6 @@
           </div>
         </router-link>
 
-        <router-link to="/admin/sizes" v-slot="{ isActive }">
-          <div :class="['item', isActive && 'active']">
-            <svg class="item-icon" viewBox="0 0 24 24" fill="none">
-              <path d="M21 6H3"/>
-              <path d="M21 12H3"/>
-              <path d="M21 18H3"/>
-            </svg>
-            Size
-          </div>
-        </router-link>
 
         <router-link to="/admin/users" v-slot="{ isActive }">
           <div :class="['item', isActive && 'active']">
@@ -126,7 +116,7 @@
           </div>
         </router-link>
 
-        <router-link to="/admin/contact" v-slot="{ isActive }">
+        <router-link to="/admin/contacts" v-slot="{ isActive }">
           <div :class="['item', isActive && 'active']">
             <svg class="item-icon" viewBox="0 0 24 24" fill="none">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>

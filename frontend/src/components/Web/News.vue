@@ -65,7 +65,7 @@ const posts = [
       <div class="left">
 
         <div class="grid">
-          <div class="card" v-for="(p,i) in posts" :key="i">
+          <div class="card" v-for="(p, i) in posts" :key="i">
             <img :src="p.img" />
 
             <span class="category">{{ p.category }}</span>
@@ -152,7 +152,6 @@ const posts = [
 </template>
 
 <style scoped>
-
 /* PAGE */
 .news-page {
   background: #f5f7fb;
@@ -203,7 +202,7 @@ const posts = [
 /* GRID */
 .grid {
   display: grid;
-  grid-template-columns: repeat(3,1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
 
@@ -292,14 +291,14 @@ const posts = [
 
 /* CTA */
 .cta {
-  background: linear-gradient(135deg,#2563eb,#4f46e5);
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
   color: white;
   padding: 20px;
   border-radius: 16px;
 }
 
 .cta input {
-  width: 100%;
+  width: 95%;
   padding: 8px;
   margin: 10px 0;
   border: none;
@@ -316,7 +315,7 @@ const posts = [
 }
 
 /* MOBILE */
-@media (max-width:768px){
+@media (max-width:768px) {
   .container {
     grid-template-columns: 1fr;
   }
