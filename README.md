@@ -58,3 +58,23 @@ npm run dev
 - Composer
 - Node.js >= 18
 - MySQL
+
+## ⚙️ Cách chạy dự án
+
++ Backend:
+cd backend
+php artisan serve
+
++ Frontend
+cd frontend
+npm run dev
+
+* Lưu ý: Trước khi chạy frontend thì phải có bootstrap,
+axios, router, vuex, nếu chx có thì cài như sau:
+npm install bootstrap
+
+npm install axios
+
+npm install vue-router@4
+
+npm install vuex@next --save
