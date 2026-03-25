@@ -2,7 +2,27 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+
 use App\Http\Controllers\UserController;
+
+use App\Http\Controllers\DanhMucController;
+use App\Http\Controllers\ThuongHieuController;
+
+
+
+
+Route::get('/danhmuc',             [DanhMucController::class, 'index']);
+Route::post('/danhmuc',         [DanhMucController::class, 'store']);
+Route::get('/danhmuc/{id_danhmuc}',        [DanhMucController::class, 'show']);
+Route::put('/danhmuc/{id_danhmuc}',        [DanhMucController::class, 'update']);
+Route::delete('/danhmuc/{id_danhmuc}',     [DanhMucController::class, 'destroy']);
+
+Route::get('/thuonghieu',             [ThuongHieuController::class, 'index']);
+Route::post('/thuonghieu',         [ThuongHieuController::class, 'store']);
+Route::get('/thuonghieu/{id_thuonghieu}',        [ThuongHieuController::class, 'show']);
+Route::put('/thuonghieu/{id_thuonghieu}',        [ThuongHieuController::class, 'update']);
+Route::delete('/thuonghieu/{id_thuonghieu}',     [ThuongHieuController::class, 'destroy']);
+
 
 Route::post('/register',         [UserController::class, 'store']);
 Route::get('/users',             [UserController::class, 'index']);
@@ -23,4 +43,5 @@ Route::middleware('admin')->group(function () {
             'message' => 'Welcome admin'
         ]);
     });
+
 });

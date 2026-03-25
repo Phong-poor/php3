@@ -25,59 +25,63 @@ const stockPercent = s => Math.min((s / 250) * 100, 100)
 const removeProduct = i => products.value.splice(i, 1)
 
 /* ═══════════════════════════════════════
-   NHÓM THUỘC TÍNH & LOẠI THUỘC TÍNH
+   DỮ LIỆU NHÓM & LOẠI THUỘC TÍNH
+   Logic: chọn 1 NHÓM → hiện TẤT CẢ loại
+   thuộc tính của nhóm đó thành CỘT trong
+   bảng biến thể. Mỗi DÒNG = 1 cấu hình
+   đầy đủ (CPU + RAM + SSD + GPU + ...)
 ═══════════════════════════════════════ */
 const attributeGroups = ref([
   {
     id: 1, name: 'Cấu hình Laptop', icon: '💻',
     attrTypes: [
-      { id: 'cpu', label: 'CPU', color: 'blue', options: ['Intel Core i5-13500H', 'Intel Core i7-13700H', 'Intel Core i9-14900H', 'Apple M3 Pro', 'AMD Ryzen 7 7745HX'] },
-      { id: 'ram', label: 'RAM', color: 'green', options: ['8GB DDR5', '16GB DDR5', '32GB DDR5', '64GB DDR5'] },
-      { id: 'ssd', label: 'SSD', color: 'amber', options: ['256GB NVMe', '512GB NVMe', '1TB NVMe Gen5', '2TB NVMe Gen5'] },
-      { id: 'gpu', label: 'GPU', color: 'pink', options: ['Intel Iris Xe', 'NVIDIA RTX 4060', 'NVIDIA RTX 4070', 'NVIDIA RTX 4080'] },
-      { id: 'os', label: 'OS', color: 'purple', options: ['Windows 11 Home', 'Windows 11 Pro', 'macOS Sonoma', 'Không có OS'] },
+      { id: 'cpu', label: 'CPU', options: ['Intel Core i5-13500H', 'Intel Core i7-13700H', 'Intel Core i9-14900H', 'Apple M3', 'Apple M3 Pro', 'Apple M3 Max', 'AMD Ryzen 5 7535HS', 'AMD Ryzen 7 7745HX'] },
+      { id: 'ram', label: 'RAM', options: ['8GB DDR5', '16GB DDR5', '32GB DDR5', '64GB DDR5', '16GB Unified', '32GB Unified', '48GB Unified', '96GB Unified'] },
+      { id: 'ssd', label: 'SSD', options: ['256GB NVMe', '512GB NVMe', '1TB NVMe Gen5', '2TB NVMe Gen5'] },
+      { id: 'gpu', label: 'GPU', options: ['Intel Iris Xe', 'NVIDIA RTX 4060', 'NVIDIA RTX 4070', 'NVIDIA RTX 4080', 'NVIDIA RTX 4090', 'AMD Radeon RX 7600M', 'Apple GPU 18-core', 'Apple GPU 40-core'] },
+      { id: 'os', label: 'OS', options: ['Windows 11 Home', 'Windows 11 Pro', 'macOS Sonoma', 'Ubuntu 24.04', 'Không có OS'] },
     ]
   },
   {
     id: 2, name: 'Điện thoại', icon: '📱',
     attrTypes: [
-      { id: 'chip', label: 'Chip', color: 'blue', options: ['Snapdragon 8 Gen 3', 'Dimensity 9300', 'Apple A17 Pro', 'Apple A16 Bionic'] },
-      { id: 'ram', label: 'RAM', color: 'green', options: ['8GB', '12GB', '16GB'] },
-      { id: 'storage', label: 'Bộ nhớ', color: 'amber', options: ['128GB', '256GB', '512GB', '1TB'] },
-      { id: 'network', label: 'Mạng', color: 'teal', options: ['4G LTE', '5G Sub-6', '5G mmWave'] },
+      { id: 'chip', label: 'Chip', options: ['Snapdragon 8 Gen 3', 'Dimensity 9300', 'Apple A17 Pro', 'Apple A16 Bionic', 'Exynos 2400'] },
+      { id: 'ram', label: 'RAM', options: ['8GB', '12GB', '16GB'] },
+      { id: 'storage', label: 'Bộ nhớ', options: ['128GB', '256GB', '512GB', '1TB'] },
+      { id: 'network', label: 'Mạng', options: ['4G LTE', '5G Sub-6', '5G mmWave'] },
     ]
   },
   {
-    id: 3, name: 'Màn hình', icon: '🖥️',
+    id: 3, name: 'Máy tính bảng', icon: '📟',
     attrTypes: [
-      { id: 'screen_size', label: 'Kích thước', color: 'purple', options: ['13.3 inch', '14 inch', '15.6 inch', '16 inch', '27 inch'] },
-      { id: 'screen_res', label: 'Độ phân giải', color: 'pink', options: ['FHD 1920×1080', '2K 2560×1440', '4K 3840×2160'] },
-      { id: 'screen_panel', label: 'Tấm nền', color: 'blue', options: ['IPS', 'OLED', 'AMOLED', 'Mini-LED'] },
+      { id: 'chip', label: 'Chip', options: ['Apple M2', 'Apple M4', 'Snapdragon 8s Gen 3', 'Dimensity 9000'] },
+      { id: 'ram', label: 'RAM', options: ['8GB', '16GB', '32GB'] },
+      { id: 'storage', label: 'Bộ nhớ', options: ['128GB', '256GB', '512GB', '1TB', '2TB'] },
+      { id: 'connect', label: 'Kết nối', options: ['WiFi only', 'WiFi + 5G', 'WiFi + 4G'] },
+      { id: 'screen', label: 'Màn hình', options: ['11 inch LCD', '11 inch OLED', '13 inch OLED', '13 inch Mini-LED'] },
     ]
   },
   {
-    id: 4, name: 'Pin & Sạc', icon: '🔋',
+    id: 4, name: 'Phụ kiện', icon: '🖱️',
     attrTypes: [
-      { id: 'battery', label: 'Pin', color: 'green', options: ['40Wh', '50Wh', '60Wh', '72Wh', '100Wh'] },
-      { id: 'charger', label: 'Sạc', color: 'amber', options: ['30W USB-C', '45W USB-C', '65W USB-C', '140W MagSafe'] },
-    ]
-  },
-  {
-    id: 5, name: 'Kết nối', icon: '📡',
-    attrTypes: [
-      { id: 'wifi', label: 'WiFi', color: 'blue', options: ['WiFi 5', 'WiFi 6', 'WiFi 6E', 'WiFi 7'] },
-      { id: 'bt', label: 'Bluetooth', color: 'purple', options: ['Bluetooth 5.0', 'Bluetooth 5.2', 'Bluetooth 5.3'] },
-      { id: 'port', label: 'Cổng', color: 'pink', options: ['USB-A x2', 'USB-C x2', 'Thunderbolt 4', 'HDMI 2.1'] },
-    ]
-  },
-  {
-    id: 6, name: 'Phụ kiện', icon: '🖱️',
-    attrTypes: [
-      { id: 'acc_type', label: 'Loại', color: 'teal', options: ['Chuột không dây', 'Chuột có dây', 'Bàn phím cơ', 'Tai nghe over-ear', 'Tai nghe in-ear'] },
-      { id: 'acc_conn', label: 'Kết nối', color: 'blue', options: ['USB-A', 'USB-C', 'Bluetooth 5.3', '2.4GHz Dongle', '3.5mm Jack'] },
+      { id: 'type', label: 'Loại', options: ['Chuột không dây', 'Chuột có dây', 'Bàn phím cơ', 'Bàn phím mỏng', 'Tai nghe over-ear', 'Tai nghe in-ear', 'Màn hình', 'Loa bluetooth'] },
+      { id: 'conn', label: 'Kết nối', options: ['USB-A', 'USB-C', 'Bluetooth 5.0', 'Bluetooth 5.3', '2.4GHz Dongle', '3.5mm Jack', 'Thunderbolt 4'] },
     ]
   },
 ])
+
+const colorList = ref([
+  { id: 1, name: 'Space Black', hex: '#1a1a1a' },
+  { id: 2, name: 'Silver', hex: '#C0C0C0' },
+  { id: 3, name: 'Midnight', hex: '#1c2951' },
+  { id: 4, name: 'Starlight', hex: '#e8dcc8' },
+  { id: 5, name: 'Rose Gold', hex: '#c9768f' },
+  { id: 6, name: 'Pacific Blue', hex: '#1f4f8a' },
+  { id: 7, name: 'Alpine Green', hex: '#4a7c59' },
+  { id: 8, name: 'Purple', hex: '#7c3aed' },
+])
+
+const colorHex = name => colorList.value.find(c => c.name === name)?.hex || '#cbd5e1'
 
 /* ═══════════════════════════════════════
    MODAL & FORM
@@ -103,92 +107,48 @@ const removeImg = () => {
 }
 
 /* ═══════════════════════════════════════
-   VARIANT STATE — FLAT TABLE + COMBO FLOW
-   
-   vsPhase 1: chọn nhóm + chọn giá trị (bảng phẳng)
-   vsPhase 2: bảng tổ hợp tự động
-   
-   selectedGroupId: nhóm đang xem
-   selectedOptions : { [typeId]: Set<value> }
-   generatedRows   : [{ id, attrs, price, stock }]
+   VARIANT STATE
+   variantStep: 1 = chọn nhóm  |  2 = bảng
+   Mỗi dòng variantRows = {
+     id, attrs: { [typeId]: 'giá trị' },
+     color, price, stock, sku
+   }
 ═══════════════════════════════════════ */
-const vsPhase = ref(1)
+const variantStep = ref(1)
 const selectedGroupId = ref(null)
-const selectedOptions = ref({})
-const generatedRows = ref([])
-const bulkPrice = ref('')
-const bulkStock = ref('')
+const variantRows = ref([])
 
-const selectedGroup = computed(() =>
+const activeGroup = computed(() =>
   attributeGroups.value.find(g => g.id === selectedGroupId.value) || null
 )
 
-/* Các loại thuộc tính đang có giá trị được chọn */
-const activeAttrTypes = computed(() => {
-  if (!selectedGroup.value) return []
-  return selectedGroup.value.attrTypes.filter(
-    t => selectedOptions.value[t.id]?.size > 0
-  )
-})
+const makeEmptyRow = () => {
+  const attrs = {}
+  activeGroup.value?.attrTypes.forEach(t => { attrs[t.id] = '' })
+  return { id: Date.now() + Math.random(), attrs, color: '', price: '', stock: 0, sku: '' }
+}
 
-const totalSelected = computed(() =>
-  Object.values(selectedOptions.value).reduce((s, set) => s + (set?.size ?? 0), 0)
-)
-
-const comboCount = computed(() => {
-  if (activeAttrTypes.value.length === 0) return 0
-  return activeAttrTypes.value.reduce(
-    (prod, t) => prod * (selectedOptions.value[t.id]?.size ?? 0), 1
-  )
-})
-
-const selectGroup = groupId => {
-  if (selectedGroupId.value === groupId) return
+const goStep2 = groupId => {
   selectedGroupId.value = groupId
-  selectedOptions.value = {}
+  const g = attributeGroups.value.find(x => x.id === groupId)
+  const attrs = {}
+  g?.attrTypes.forEach(t => { attrs[t.id] = '' })
+  variantRows.value = [{ id: Date.now(), attrs, color: '', price: '', stock: 0, sku: '' }]
+  variantStep.value = 2
 }
 
-const toggleOption = (typeId, value) => {
-  if (!selectedOptions.value[typeId]) selectedOptions.value[typeId] = new Set()
-  const set = selectedOptions.value[typeId]
-  if (set.has(value)) set.delete(value)
-  else set.add(value)
-  selectedOptions.value = { ...selectedOptions.value }
-}
+const backStep1 = () => { variantStep.value = 1; selectedGroupId.value = null }
 
-const isSelected = (typeId, value) =>
-  selectedOptions.value[typeId]?.has(value) ?? false
+const addVariantRow = () => variantRows.value.push(makeEmptyRow())
+const removeVariantRow = i => { if (variantRows.value.length > 1) variantRows.value.splice(i, 1) }
 
-const selectedCountInGroup = g =>
-  g.attrTypes.reduce((s, t) => s + (selectedOptions.value[t.id]?.size ?? 0), 0)
-
-/* Cartesian product */
-const cartesian = arrays => {
-  if (arrays.length === 0) return [[]]
-  const [first, ...rest] = arrays
-  const tail = cartesian(rest)
-  return first.flatMap(v => tail.map(c => [v, ...c]))
-}
-
-const generateVariants = () => {
-  if (!activeAttrTypes.value.length) return
-  const arrays = activeAttrTypes.value.map(t => [...selectedOptions.value[t.id]])
-  const combos = cartesian(arrays)
-  generatedRows.value = combos.map((combo, i) => {
-    const attrs = {}
-    activeAttrTypes.value.forEach((t, ti) => { attrs[t.id] = combo[ti] })
-    return { id: Date.now() + i, attrs, price: '', stock: 0 }
-  })
-  vsPhase.value = 2
-}
-
-const backToSelect = () => { vsPhase.value = 1 }
-const removeRow = i => { if (generatedRows.value.length > 1) generatedRows.value.splice(i, 1) }
-
-const applyBulkAll = () => {
-  generatedRows.value.forEach(r => {
-    if (bulkPrice.value) r.price = bulkPrice.value
-    if (bulkStock.value !== '') r.stock = Number(bulkStock.value)
+// Nhân bản dòng – copy toàn bộ attrs, chỉ reset stock về 0
+const cloneRow = i => {
+  const src = variantRows.value[i]
+  variantRows.value.splice(i + 1, 0, {
+    id: Date.now() + Math.random(),
+    attrs: { ...src.attrs },
+    color: src.color, price: src.price, stock: 0, sku: ''
   })
 }
 
@@ -196,15 +156,8 @@ const applyBulkAll = () => {
    OPEN / CLOSE / SUBMIT
 ═══════════════════════════════════════ */
 const openModal = () => {
-  form.value = defaultForm()
-  imgPreview.value = ''
-  formError.value = ''
-  vsPhase.value = 1
-  selectedGroupId.value = null
-  selectedOptions.value = {}
-  generatedRows.value = []
-  bulkPrice.value = ''
-  bulkStock.value = ''
+  form.value = defaultForm(); imgPreview.value = ''; formError.value = ''
+  variantStep.value = 1; selectedGroupId.value = null; variantRows.value = []
   showModal.value = true
 }
 const closeModal = () => { showModal.value = false }
@@ -280,7 +233,7 @@ const submitForm = () => {
         <option>Tất cả danh mục</option>
         <option>Máy tính xách tay</option>
         <option>Điện thoại</option>
-        <option>Màn hình</option>
+        <option>Máy tính bảng</option>
         <option>Phụ kiện</option>
       </select>
     </div>
@@ -319,8 +272,7 @@ const submitForm = () => {
                 </div>
               </div>
             </td>
-            <td><span class="status-badge" :class="p.status === 'Đang bán' ? 'active' : 'draft'">{{ p.status }}</span>
-            </td>
+            <td><span class="status-badge" :class="p.status === 'Đang bán' ? 'active' : 'draft'">{{ p.status }}</span></td>
             <td>
               <div class="actions">
                 <button class="act-btn" title="Xem">
@@ -410,7 +362,7 @@ const submitForm = () => {
                   <option value="">-- Chọn danh mục --</option>
                   <option>Máy tính xách tay</option>
                   <option>Điện thoại</option>
-                  <option>Màn hình</option>
+                  <option>Máy tính bảng</option>
                   <option>Phụ kiện</option>
                 </select>
               </div>
@@ -444,175 +396,169 @@ const submitForm = () => {
                   <span class="vs-bar"></span>
                   Biến thể sản phẩm
                 </div>
-                <div class="vs-steps">
-                  <span class="vss" :class="{ active: vsPhase === 1, done: vsPhase === 2 }">
-                    <span class="vss-dot">{{ vsPhase === 2 ? '✓' : '1' }}</span>
-                    Chọn giá trị
-                  </span>
-                  <span class="vss-line"></span>
-                  <span class="vss" :class="{ active: vsPhase === 2 }">
-                    <span class="vss-dot">2</span>
-                    Điền giá &amp; kho
-                  </span>
+                <div v-if="variantStep === 2" class="vs-active-group">
+                  <span class="vag-icon">{{ activeGroup?.icon }}</span>
+                  <span class="vag-name">{{ activeGroup?.name }}</span>
+                  <button class="vag-change" @click="backStep1">Đổi nhóm ↩</button>
                 </div>
               </div>
 
-              <!-- ══════════ PHASE 1 ══════════ -->
-              <template v-if="vsPhase === 1">
-
-                <!-- Chọn nhóm thuộc tính -->
-                <div class="group-tabs">
-                  <button v-for="g in attributeGroups" :key="g.id" class="gtab"
-                    :class="{ 'gtab-active': selectedGroupId === g.id }" @click="selectGroup(g.id)">
-                    <span class="gtab-icon">{{ g.icon }}</span>
-                    <span class="gtab-name">{{ g.name }}</span>
-                    <span v-if="selectedCountInGroup(g) > 0" class="gtab-badge">
-                      {{ selectedCountInGroup(g) }}
-                    </span>
+              <!-- ─── STEP 1: CHỌN NHÓM ─── -->
+              <div v-if="variantStep === 1">
+                <p class="step-hint">
+                  Chọn nhóm sản phẩm. Hệ thống sẽ hiển thị <strong>tất cả loại thuộc tính</strong> của nhóm đó
+                  thành các cột — mỗi dòng biến thể bạn tự chọn giá trị tương ứng cho từng cột (CPU, RAM, SSD, GPU...).
+                </p>
+                <div class="group-list">
+                  <button v-for="g in attributeGroups" :key="g.id" class="group-card" @click="goStep2(g.id)">
+                    <span class="gc-icon">{{ g.icon }}</span>
+                    <div class="gc-body">
+                      <span class="gc-name">{{ g.name }}</span>
+                      <div class="gc-chips">
+                        <span v-for="t in g.attrTypes" :key="t.id" class="gc-chip">{{ t.label }}</span>
+                      </div>
+                    </div>
+                    <span class="gc-count">{{ g.attrTypes.length }} thuộc tính / dòng</span>
+                    <span class="gc-arrow">›</span>
                   </button>
                 </div>
+              </div>
 
-                <!-- Bảng chọn giá trị (flat table) -->
-                <div v-if="selectedGroup" class="flat-select-table">
-                  <div v-for="t in selectedGroup.attrTypes" :key="t.id" class="fst-row">
-                    <!-- Label loại -->
-                    <div class="fst-label">
-                      <span class="type-pill" :class="'tp-' + t.color">{{ t.label }}</span>
-                      <span v-if="selectedOptions[t.id]?.size" class="fst-count">
-                        {{ selectedOptions[t.id].size }}
-                      </span>
-                    </div>
+              <!-- ─── STEP 2: BẢNG BIẾN THỂ ─── -->
+              <div v-if="variantStep === 2 && activeGroup">
 
-                    <!-- Nút toggle giá trị -->
-                    <div class="fst-options">
-                      <button v-for="opt in t.options" :key="opt" class="vbtn"
-                        :class="['vbtn-' + t.color, { 'vbtn-on': isSelected(t.id, opt) }]"
-                        @click="toggleOption(t.id, opt)">
-                        <svg v-if="isSelected(t.id, opt)" viewBox="0 0 10 10" fill="none" stroke="currentColor"
-                          stroke-width="2.2" stroke-linecap="round" width="9" height="9">
-                          <polyline points="1,5 3.5,7.5 9,2" />
-                        </svg>
-                        {{ opt }}
-                      </button>
-                    </div>
-                  </div>
+                <!-- Chú thích cột -->
+                <div class="col-legend">
+                  <span class="cl-label">Cột hiển thị:</span>
+                  <span v-for="t in activeGroup.attrTypes" :key="t.id" class="cl-chip cl-attr">{{ t.label }}</span>
+                  <span class="cl-sep">＋</span>
+                  <span class="cl-chip cl-color">Màu</span>
+                  <span class="cl-chip cl-price">Giá riêng</span>
+                  <span class="cl-chip cl-stock">Kho</span>
+                  <span class="cl-chip cl-sku">SKU</span>
                 </div>
 
-                <!-- Placeholder khi chưa chọn nhóm -->
-                <div v-else class="group-placeholder">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
-                    width="28" height="28">
-                    <rect x="3" y="3" width="18" height="18" rx="3" />
-                    <path d="M9 12h6M12 9v6" />
-                  </svg>
-                  <span>Chọn nhóm thuộc tính ở trên để bắt đầu</span>
-                </div>
-
-                <!-- Footer phase 1 -->
-                <div v-if="selectedGroup" class="p1-footer">
-                  <!-- Combo preview -->
-                  <div v-if="activeAttrTypes.length > 0" class="combo-bar">
-                    <span class="combo-formula">
-                      <template v-for="(t, i) in activeAttrTypes" :key="t.id">
-                        <span class="cf-item">
-                          <span class="type-pill-sm" :class="'tp-' + t.color">{{ t.label }}</span>
-                          <b>{{ selectedOptions[t.id]?.size }}</b>
-                        </span>
-                        <span v-if="i < activeAttrTypes.length - 1" class="cf-x">×</span>
-                      </template>
-                      <span class="cf-eq">= <b>{{ comboCount }} biến thể</b></span>
-                    </span>
-                  </div>
-
-                  <div class="p1-actions">
-                    <span v-if="!activeAttrTypes.length" class="p1-hint">
-                      Chọn ít nhất 1 giá trị từ bất kỳ loại nào
-                    </span>
-                    <button class="btn-generate" :disabled="!activeAttrTypes.length" @click="generateVariants">
-                      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2"
-                        stroke-linecap="round" width="13" height="13">
-                        <rect x="1" y="1" width="12" height="12" rx="2" />
-                        <polyline points="3.5,7 5.5,9 10.5,4.5" />
-                      </svg>
-                      Tạo {{ comboCount > 0 ? comboCount + ' ' : '' }}biến thể
-                    </button>
-                  </div>
-                </div>
-
-              </template>
-
-              <!-- ══════════ PHASE 2 ══════════ -->
-              <template v-if="vsPhase === 2">
-
-                <!-- Toolbar -->
-                <div class="p2-toolbar">
-                  <button class="btn-back" @click="backToSelect">
-                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
-                      width="11" height="11">
-                      <polyline points="7.5,1.5 3,6 7.5,10.5" />
-                    </svg>
-                    Chỉnh lại lựa chọn
-                  </button>
-                  <div class="bulk-bar">
-                    <span class="bulk-lbl">Điền nhanh:</span>
-                    <input v-model="bulkPrice" class="bulk-in" placeholder="Giá chung" />
-                    <input v-model="bulkStock" class="bulk-in bulk-num" type="number" min="0" placeholder="Kho" />
-                    <button class="btn-apply" @click="applyBulkAll">Áp dụng tất cả</button>
-                  </div>
-                </div>
-
-                <!-- Info -->
-                <div class="p2-info">
-                  Đã tạo <b>{{ generatedRows.length }}</b> tổ hợp từ
-                  <b>{{ activeAttrTypes.length }}</b> loại thuộc tính —
-                  mỗi hàng là duy nhất, không trùng lặp.
-                </div>
-
-                <!-- Bảng -->
+                <!-- Bảng cuộn ngang -->
                 <div class="vt-scroll">
                   <table class="vt-table">
                     <thead>
                       <tr>
                         <th class="th-no">#</th>
-                        <th v-for="t in activeAttrTypes" :key="t.id">
-                          <span class="type-pill" :class="'tp-' + t.color">{{ t.label }}</span>
+                        <th v-for="t in activeGroup.attrTypes" :key="t.id" class="th-attr">
+                          <span class="th-attr-pill" :data-type="t.id">{{ t.label }}</span>
                         </th>
+                        <th class="th-color">Màu sắc</th>
                         <th class="th-price">Giá riêng (₫)</th>
                         <th class="th-stock">Kho</th>
+                        <th class="th-sku">SKU biến thể</th>
                         <th class="th-act"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(row, ri) in generatedRows" :key="row.id" class="vt-row">
+                      <tr v-for="(row, ri) in variantRows" :key="row.id" class="vt-row">
+                        <!-- STT -->
                         <td class="td-no"><span class="row-no">{{ ri + 1 }}</span></td>
-                        <td v-for="t in activeAttrTypes" :key="t.id">
-                          <span class="val-chip" :class="'vc-' + t.color">
-                            {{ row.attrs[t.id] }}
-                          </span>
+
+                        <!-- Cột mỗi loại thuộc tính → dropdown chọn giá trị -->
+                        <td v-for="t in activeGroup.attrTypes" :key="t.id" class="td-attr">
+                          <select v-model="row.attrs[t.id]" class="vt-select">
+                            <option value="">— {{ t.label }} —</option>
+                            <option v-for="opt in t.options" :key="opt" :value="opt">{{ opt }}</option>
+                          </select>
                         </td>
-                        <td><input v-model="row.price" class="vt-input" placeholder="45.990.000" /></td>
-                        <td><input v-model="row.stock" type="number" min="0" class="vt-input vt-num" /></td>
+
+                        <!-- Màu -->
+                        <td class="td-color">
+                          <div class="color-wrap">
+                            <span v-if="row.color" class="cswatch" :style="{ background: colorHex(row.color) }"></span>
+                            <select v-model="row.color" class="vt-select">
+                              <option value="">Không chọn</option>
+                              <option v-for="c in colorList" :key="c.id" :value="c.name">{{ c.name }}</option>
+                            </select>
+                          </div>
+                        </td>
+
+                        <!-- Giá riêng -->
+                        <td class="td-price">
+                          <input v-model="row.price" class="vt-input" placeholder="45.990.000" />
+                        </td>
+
+                        <!-- Kho -->
+                        <td class="td-stock">
+                          <input v-model="row.stock" type="number" min="0" class="vt-input vt-num" />
+                        </td>
+
+                        <!-- SKU biến thể -->
+                        <td class="td-sku">
+                          <input v-model="row.sku" class="vt-input" placeholder="VN-LP-i7-16-512" />
+                        </td>
+
+                        <!-- Actions: clone + xóa -->
                         <td class="td-act">
-                          <button class="ra-del" title="Xóa" @click="removeRow(ri)">
-                            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2"
-                              stroke-linecap="round" width="10" height="10">
-                              <line x1="1" y1="1" x2="11" y2="11" />
-                              <line x1="11" y1="1" x2="1" y2="11" />
-                            </svg>
-                          </button>
+                          <div class="row-acts">
+                            <button class="ra-btn ra-clone" title="Nhân bản dòng này" @click="cloneRow(ri)">
+                              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"
+                                stroke-linecap="round" width="13" height="13">
+                                <rect x="5" y="5" width="8" height="8" rx="1.5" />
+                                <path d="M3 11V3a1 1 0 0 1 1-1h8" />
+                              </svg>
+                            </button>
+                            <button class="ra-btn ra-del" title="Xóa dòng" @click="removeVariantRow(ri)">
+                              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2"
+                                stroke-linecap="round" width="11" height="11">
+                                <line x1="2" y1="2" x2="12" y2="12" />
+                                <line x1="12" y1="2" x2="2" y2="12" />
+                              </svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                <div class="p2-foot">
-                  <span class="p2-count"><b>{{ generatedRows.length }}</b> biến thể</span>
+                <!-- Preview các dòng đã điền -->
+                <div v-if="variantRows.some(r => Object.values(r.attrs).some(v => v))" class="vt-preview">
+                  <div class="vtp-label">Xem trước cấu hình</div>
+                  <div v-for="(row, ri) in variantRows" :key="row.id" class="vtp-row">
+                    <span class="vtp-no">{{ ri + 1 }}</span>
+                    <template v-for="t in activeGroup.attrTypes" :key="t.id">
+                      <span v-if="row.attrs[t.id]" class="vtp-chip" :class="'c-' + t.id">
+                        <span class="vtp-type">{{ t.label }}</span>
+                        {{ row.attrs[t.id] }}
+                      </span>
+                    </template>
+                    <span v-if="row.color" class="vtp-color-wrap">
+                      <span class="vtp-dot" :style="{ background: colorHex(row.color) }"></span>
+                      {{ row.color }}
+                    </span>
+                    <span v-if="row.price" class="vtp-price">{{ row.price }} ₫</span>
+                    <span v-if="row.stock" class="vtp-stock">Kho: {{ row.stock }}</span>
+                    <span v-if="row.sku" class="vtp-sku">{{ row.sku }}</span>
+                  </div>
                 </div>
 
-              </template>
+                <!-- Footer -->
+                <div class="vt-footer">
+                  <button class="btn-add-row" @click="addVariantRow">
+                    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                      width="11" height="11">
+                      <line x1="7" y1="1" x2="7" y2="13" />
+                      <line x1="1" y1="7" x2="13" y2="7" />
+                    </svg>
+                    Thêm dòng biến thể
+                  </button>
+                  <span class="vt-stat">
+                    <b>{{ variantRows.length }}</b> biến thể ·
+                    <b>{{ activeGroup.attrTypes.length }}</b> thuộc tính / dòng
+                  </span>
+                </div>
 
-            </div><!-- /vs-wrapper -->
+              </div>
+              <!-- /step2 -->
+
+            </div>
+            <!-- /vs-wrapper -->
 
             <p v-if="formError" class="form-error">⚠ {{ formError }}</p>
           </div>
@@ -637,6 +583,7 @@ const submitForm = () => {
   font-family: 'Segoe UI', sans-serif;
 }
 
+/* HEADER */
 .top {
   display: flex;
   justify-content: space-between;
@@ -674,6 +621,7 @@ const submitForm = () => {
   transform: translateY(-1px);
 }
 
+/* STATS */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -730,6 +678,7 @@ const submitForm = () => {
   background: #ede9fe
 }
 
+/* FILTER */
 .filter-bar {
   display: flex;
   gap: 10px;
@@ -781,6 +730,7 @@ const submitForm = () => {
   min-width: 160px;
 }
 
+/* TABLE */
 .table-wrap {
   background: white;
   border-radius: 14px;
@@ -951,6 +901,7 @@ tbody td {
   color: #ef4444;
 }
 
+/* PAGINATION */
 .pagination {
   display: flex;
   gap: 6px;
@@ -981,7 +932,7 @@ tbody td {
   color: white !important;
 }
 
-/* ══ MODAL ══ */
+/* ══ MODAL BASE ══ */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1005,7 +956,7 @@ tbody td {
 }
 
 .modal-wide {
-  max-width: 960px;
+  max-width: 1100px;
 }
 
 @keyframes modalIn {
@@ -1048,6 +999,7 @@ tbody td {
   cursor: pointer;
   line-height: 1;
   padding: 0;
+  transition: color .2s;
 }
 
 .modal-close:hover {
@@ -1074,6 +1026,7 @@ tbody td {
   border-radius: 0 0 18px 18px;
 }
 
+/* UPLOAD */
 .upload-zone {
   border: 2px dashed #cbd5e1;
   border-radius: 10px;
@@ -1147,6 +1100,7 @@ tbody td {
   font-weight: 600;
   color: #475569;
   cursor: pointer;
+  transition: all .2s;
 }
 
 .img-change:hover {
@@ -1165,6 +1119,11 @@ tbody td {
   cursor: pointer;
 }
 
+.img-remove-btn:hover {
+  background: #fee2e2;
+}
+
+/* FORM */
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1225,6 +1184,7 @@ tbody td {
   font-weight: 600;
   color: #475569;
   cursor: pointer;
+  transition: all .2s;
 }
 
 .btn-cancel:hover {
@@ -1240,6 +1200,7 @@ tbody td {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: opacity .2s, transform .2s;
 }
 
 .btn-submit:hover {
@@ -1247,19 +1208,20 @@ tbody td {
   transform: translateY(-1px);
 }
 
-/* ══════════════════════════════════════
+/* ══════════════════════════════════════════
    VARIANT SECTION
-══════════════════════════════════════ */
+══════════════════════════════════════════ */
 .vs-wrapper {
   border: 1.5px solid #e2e8f0;
   border-radius: 14px;
-  padding: 18px 20px;
+  padding: 20px;
   background: #fafbff;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
+/* header */
 .vs-header {
   display: flex;
   align-items: center;
@@ -1286,559 +1248,189 @@ tbody td {
   flex-shrink: 0;
 }
 
-/* Step indicator */
-.vs-steps {
+/* active group badge */
+.vs-active-group {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.vss {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #94a3b8;
-}
-
-.vss.active {
-  color: #2563eb;
-}
-
-.vss.done {
-  color: #16a34a;
-}
-
-.vss-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid #e2e8f0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
-  background: white;
-}
-
-.vss.active .vss-dot {
-  border-color: #2563eb;
-  background: #2563eb;
-  color: white;
-}
-
-.vss.done .vss-dot {
-  border-color: #16a34a;
-  background: #16a34a;
-  color: white;
-}
-
-.vss-line {
-  width: 24px;
-  height: 2px;
-  background: #e2e8f0;
-  border-radius: 1px;
-}
-
-/* ── GROUP TABS ── */
-.group-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.gtab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 13px;
-  border-radius: 8px;
-  border: 1.5px solid #e2e8f0;
-  background: white;
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
-  transition: all .15s;
-  font-family: inherit;
-}
-
-.gtab:hover {
-  border-color: #93c5fd;
-  color: #2563eb;
-}
-
-.gtab-active {
-  border-color: #2563eb !important;
-  background: #eff6ff !important;
-  color: #1d4ed8 !important;
-}
-
-.gtab-icon {
-  font-size: 15px;
-}
-
-.gtab-name {
-  white-space: nowrap;
-}
-
-.gtab-badge {
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  padding: 0 5px;
-  background: #2563eb;
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* ── FLAT SELECT TABLE ── */
-.flat-select-table {
-  background: white;
-  border: 1px solid #e8edf5;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.fst-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding: 11px 16px;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.fst-row:last-child {
-  border-bottom: none;
-}
-
-.fst-label {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-width: 72px;
-  flex-shrink: 0;
-  padding-top: 2px;
-}
-
-.fst-count {
-  font-size: 10px;
-  font-weight: 700;
-  color: #2563eb;
-  background: #dbeafe;
-  padding: 1px 6px;
-  border-radius: 8px;
-}
-
-.fst-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  flex: 1;
-}
-
-/* Type pill (label) */
-.type-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
+  padding: 5px 10px 5px 12px;
   border-radius: 20px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.vag-icon {
+  font-size: 16px;
+}
+
+.vag-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.vag-change {
+  background: none;
+  border: none;
   font-size: 11px;
-  font-weight: 700;
-}
-
-.tp-blue {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.tp-green {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.tp-amber {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.tp-pink {
-  background: #fce7f3;
-  color: #be185d;
-}
-
-.tp-purple {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
-
-.tp-teal {
-  background: #ccfbf1;
-  color: #0f766e;
-}
-
-.tp-red {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-/* Smaller pill for combo formula */
-.type-pill-sm {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 7px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.type-pill-sm.tp-blue {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.type-pill-sm.tp-green {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.type-pill-sm.tp-amber {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.type-pill-sm.tp-pink {
-  background: #fce7f3;
-  color: #be185d;
-}
-
-.type-pill-sm.tp-purple {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
-
-.type-pill-sm.tp-teal {
-  background: #ccfbf1;
-  color: #0f766e;
-}
-
-/* Toggle buttons */
-.vbtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 11px;
-  border-radius: 6px;
-  border: 1.5px solid #e2e8f0;
-  background: white;
-  font-size: 12px;
-  font-weight: 500;
-  color: #475569;
-  cursor: pointer;
-  transition: all .12s;
-  white-space: nowrap;
-  font-family: inherit;
-}
-
-/* OFF hover per color */
-.vbtn-blue:hover {
-  border-color: #93c5fd;
   color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
 }
 
-.vbtn-green:hover {
-  border-color: #86efac;
-  color: #166534;
+.vag-change:hover {
+  color: #1d4ed8;
 }
 
-.vbtn-amber:hover {
-  border-color: #fcd34d;
-  color: #92400e;
-}
-
-.vbtn-pink:hover {
-  border-color: #f9a8d4;
-  color: #be185d;
-}
-
-.vbtn-purple:hover {
-  border-color: #d8b4fe;
-  color: #6b21a8;
-}
-
-.vbtn-teal:hover {
-  border-color: #5eead4;
-  color: #0f766e;
-}
-
-.vbtn-red:hover {
-  border-color: #fca5a5;
-  color: #991b1b;
-}
-
-/* ON state per color */
-.vbtn-blue.vbtn-on {
-  border-color: #2563eb;
-  background: #2563eb;
-  color: white;
-  font-weight: 600;
-}
-
-.vbtn-green.vbtn-on {
-  border-color: #16a34a;
-  background: #16a34a;
-  color: white;
-  font-weight: 600;
-}
-
-.vbtn-amber.vbtn-on {
-  border-color: #d97706;
-  background: #d97706;
-  color: white;
-  font-weight: 600;
-}
-
-.vbtn-pink.vbtn-on {
-  border-color: #db2777;
-  background: #db2777;
-  color: white;
-  font-weight: 600;
-}
-
-.vbtn-purple.vbtn-on {
-  border-color: #7c3aed;
-  background: #7c3aed;
-  color: white;
-  font-weight: 600;
-}
-
-.vbtn-teal.vbtn-on {
-  border-color: #0d9488;
-  background: #0d9488;
-  color: white;
-  font-weight: 600;
-}
-
-.vbtn-red.vbtn-on {
-  border-color: #dc2626;
-  background: #dc2626;
-  color: white;
-  font-weight: 600;
-}
-
-/* Placeholder */
-.group-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 28px 20px;
-  color: #94a3b8;
+.step-hint {
   font-size: 12px;
-  background: white;
-  border: 1.5px dashed #e2e8f0;
-  border-radius: 10px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.65;
 }
 
-/* ── PHASE 1 FOOTER ── */
-.p1-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 13px 16px;
-  background: white;
-  border: 1px solid #e8edf5;
-  border-radius: 10px;
-}
-
-.combo-bar {}
-
-.combo-formula {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.cf-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.cf-item b {
-  font-size: 13px;
+.step-hint strong {
   color: #0f172a;
 }
 
-.cf-x {
-  font-size: 13px;
-  color: #94a3b8;
-  font-weight: 600;
+/* GROUP LIST */
+.group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.cf-eq {
-  font-size: 12px;
-  color: #64748b;
-  padding-left: 4px;
-}
-
-.cf-eq b {
-  font-size: 13px;
-  color: #2563eb;
-}
-
-.p1-actions {
+.group-card {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.p1-hint {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.btn-generate {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 22px;
-  border-radius: 10px;
-  border: none;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  color: white;
-  font-size: 13px;
-  font-weight: 700;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, .28);
-  transition: opacity .2s, transform .2s;
-  font-family: inherit;
+  text-align: left;
+  width: 100%;
+  transition: all .2s;
 }
 
-.btn-generate:hover {
-  opacity: .9;
+.group-card:hover {
+  border-color: #2563eb;
+  background: #f0f6ff;
+  box-shadow: 0 2px 14px rgba(37, 99, 235, .1);
   transform: translateY(-1px);
 }
 
-.btn-generate:disabled {
-  background: #e2e8f0;
-  color: #94a3b8;
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
+.gc-icon {
+  font-size: 26px;
+  flex-shrink: 0;
 }
 
-/* ── PHASE 2 TOOLBAR ── */
-.p2-toolbar {
+.gc-body {
+  flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.btn-back {
-  display: inline-flex;
+.gc-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.gc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.gc-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.gc-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  white-space: nowrap;
+  padding: 3px 10px;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+
+.gc-arrow {
+  color: #94a3b8;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+/* COL LEGEND */
+.col-legend {
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 13px;
-  border-radius: 8px;
-  border: 1.5px solid #e2e8f0;
-  background: white;
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-  cursor: pointer;
-  transition: all .2s;
-  font-family: inherit;
-}
-
-.btn-back:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-  background: #eff6ff;
-}
-
-.bulk-bar {
-  display: flex;
-  align-items: center;
-  gap: 7px;
   flex-wrap: wrap;
-  padding: 7px 11px;
+  padding: 10px 14px;
   background: #f8fafc;
-  border-radius: 9px;
+  border-radius: 8px;
   border: 1px solid #f1f5f9;
 }
 
-.bulk-lbl {
+.cl-label {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: #64748b;
+  margin-right: 2px;
   white-space: nowrap;
 }
 
-.bulk-in {
-  padding: 6px 9px;
-  border-radius: 7px;
-  border: 1px solid #e2e8f0;
-  font-size: 12px;
-  color: #0f172a;
-  outline: none;
-  background: white;
-  transition: border-color .2s;
-  width: 108px;
-  font-family: inherit;
+.cl-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
 }
 
-.bulk-in:focus {
-  border-color: #2563eb;
+.cl-attr {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
-.bulk-num {
-  width: 68px;
-  text-align: right;
+.cl-color {
+  background: #fce7f3;
+  color: #be185d;
 }
 
-.btn-apply {
-  padding: 6px 13px;
-  border-radius: 7px;
-  border: none;
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  color: white;
-  font-size: 12px;
+.cl-price {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.cl-stock {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.cl-sku {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.cl-sep {
+  font-size: 13px;
+  color: #94a3b8;
   font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  font-family: inherit;
+  margin: 0 2px;
 }
 
-.btn-apply:hover {
-  opacity: .88;
-}
-
-.p2-info {
-  font-size: 12px;
-  color: #92400e;
-  padding: 8px 13px;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  border-radius: 8px;
-}
-
-.p2-info b {
-  color: #92400e;
-}
-
-/* Variant table */
+/* VARIANT TABLE */
 .vt-scroll {
   overflow-x: auto;
   border: 1px solid #e8edf5;
@@ -1849,7 +1441,7 @@ tbody td {
 .vt-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 480px;
+  min-width: 600px;
 }
 
 .vt-table thead tr {
@@ -1857,37 +1449,120 @@ tbody td {
 }
 
 .vt-table thead th {
-  padding: 9px 12px;
+  padding: 10px 12px;
   font-size: 10px;
   font-weight: 700;
   color: #94a3b8;
   text-align: left;
-  letter-spacing: .06em;
+  letter-spacing: .07em;
   border-bottom: 1px solid #f1f5f9;
   white-space: nowrap;
 }
 
 .th-no {
-  width: 38px;
+  width: 40px;
   text-align: center;
+}
+
+.th-attr {
+  min-width: 155px;
+}
+
+.th-color {
+  min-width: 145px;
 }
 
 .th-price {
-  min-width: 138px;
+  min-width: 145px;
 }
 
 .th-stock {
-  width: 76px;
+  width: 80px;
+}
+
+.th-sku {
+  min-width: 160px;
 }
 
 .th-act {
-  width: 44px;
+  width: 72px;
   text-align: center;
+}
+
+.th-attr-pill {
+  display: inline-flex;
+  padding: 2px 9px;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Different pastel per attr type */
+.th-attr-pill[data-type="cpu"] {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.th-attr-pill[data-type="ram"] {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.th-attr-pill[data-type="ssd"] {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.th-attr-pill[data-type="gpu"] {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.th-attr-pill[data-type="os"] {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.th-attr-pill[data-type="chip"] {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.th-attr-pill[data-type="storage"] {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.th-attr-pill[data-type="network"] {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.th-attr-pill[data-type="connect"] {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.th-attr-pill[data-type="screen"] {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.th-attr-pill[data-type="type"] {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.th-attr-pill[data-type="conn"] {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .vt-row {
   border-bottom: 1px solid #f8fafc;
-  transition: background .12s;
+  transition: background .15s;
 }
 
 .vt-row:last-child {
@@ -1907,10 +1582,6 @@ tbody td {
   text-align: center;
 }
 
-.td-act {
-  text-align: center;
-}
-
 .row-no {
   display: inline-flex;
   align-items: center;
@@ -1924,62 +1595,26 @@ tbody td {
   font-weight: 700;
 }
 
-/* Value chip in table */
-.val-chip {
-  display: inline-block;
+.vt-select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
   font-size: 12px;
-  font-weight: 500;
-  padding: 3px 9px;
-  border-radius: 5px;
-  white-space: nowrap;
-  border: 1px solid;
+  color: #0f172a;
+  outline: none;
+  background: #fafbff;
+  cursor: pointer;
+  transition: border-color .2s;
 }
 
-.vc-blue {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  color: #1d4ed8;
-}
-
-.vc-green {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #166534;
-}
-
-.vc-amber {
-  background: #fffbeb;
-  border-color: #fde68a;
-  color: #92400e;
-}
-
-.vc-pink {
-  background: #fdf2f8;
-  border-color: #f9a8d4;
-  color: #be185d;
-}
-
-.vc-purple {
-  background: #faf5ff;
-  border-color: #e9d5ff;
-  color: #6b21a8;
-}
-
-.vc-teal {
-  background: #f0fdfa;
-  border-color: #99f6e4;
-  color: #0f766e;
-}
-
-.vc-red {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #991b1b;
+.vt-select:focus {
+  border-color: #2563eb;
 }
 
 .vt-input {
   width: 100%;
-  padding: 7px 9px;
+  padding: 7px 10px;
   border-radius: 7px;
   border: 1px solid #e2e8f0;
   font-size: 12px;
@@ -1988,7 +1623,6 @@ tbody td {
   background: #fafbff;
   transition: border-color .2s;
   box-sizing: border-box;
-  font-family: inherit;
 }
 
 .vt-input:focus {
@@ -1999,18 +1633,44 @@ tbody td {
   text-align: right;
 }
 
-.ra-del {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
+.color-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cswatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(0, 0, 0, .1);
+}
+
+.row-acts {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.ra-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
   border: 1px solid #e2e8f0;
   background: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
   transition: all .2s;
+  color: #94a3b8;
+}
+
+.ra-clone:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
 }
 
 .ra-del:hover {
@@ -2019,22 +1679,219 @@ tbody td {
   color: #ef4444;
 }
 
-.p2-foot {
+/* PREVIEW */
+.vt-preview {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 0;
+  background: white;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
-.p2-count {
+.vtp-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  padding: 9px 14px;
+  background: #f8fafc;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.vtp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  border-bottom: 1px solid #f8fafc;
+}
+
+.vtp-row:last-child {
+  border-bottom: none;
+}
+
+.vtp-no {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vtp-chip {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vtp-type {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: .7;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.vtp-chip.c-cpu {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.vtp-chip.c-ram {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.vtp-chip.c-ssd {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.vtp-chip.c-gpu {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.vtp-chip.c-os {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.vtp-chip.c-chip {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.vtp-chip.c-storage {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.vtp-chip.c-network {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.vtp-chip.c-connect {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.vtp-chip.c-screen {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.vtp-chip.c-type {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.vtp-chip.c-conn {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.vtp-color-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #334155;
+  padding: 3px 9px;
+  border-radius: 5px;
+  background: #fce7f3;
+}
+
+.vtp-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, .1);
+  flex-shrink: 0;
+}
+
+.vtp-price {
+  font-size: 11px;
+  font-weight: 700;
+  color: #16a34a;
+  padding: 3px 8px;
+  background: #dcfce7;
+  border-radius: 5px;
+}
+
+.vtp-stock {
+  font-size: 11px;
+  color: #92400e;
+  padding: 3px 8px;
+  background: #fef3c7;
+  border-radius: 5px;
+}
+
+.vtp-sku {
+  font-size: 11px;
+  color: #6b21a8;
+  padding: 3px 8px;
+  background: #f3e8ff;
+  border-radius: 5px;
+  font-family: monospace;
+}
+
+/* FOOTER */
+.vt-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.btn-add-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1.5px dashed #22c55e;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #16a34a;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.btn-add-row:hover {
+  background: #f0fdf4;
+  border-color: #16a34a;
+}
+
+.vt-stat {
   font-size: 12px;
   color: #64748b;
 }
 
-.p2-count b {
+.vt-stat b {
   color: #0f172a;
 }
 
 /* ══ RESPONSIVE ══ */
-@media (max-width: 768px) {
+@media (max-width:768px) {
   .admin {
     padding: 20px 16px;
   }
@@ -2063,18 +1920,9 @@ tbody td {
     max-width: 98vw;
   }
 
-  .vs-steps {
+  .gc-chips,
+  .gc-count {
     display: none;
-  }
-
-  .p2-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .fst-row {
-    flex-direction: column;
-    gap: 8px;
   }
 }
 </style>
