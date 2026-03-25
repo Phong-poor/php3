@@ -103,7 +103,8 @@ const removeItem = (index) => cart.value.splice(index, 1)
                 </div>
 
                 <router-link to="/checkout" class="checkout">
-                    Thanh toán ngay →
+                    <span>Thanh toán ngay</span>
+                    <span class="icon">→</span>
                 </router-link>
 
             </div>
@@ -148,29 +149,53 @@ const removeItem = (index) => cart.value.splice(index, 1)
     background: linear-gradient(180deg, #f8fafc, #eef2ff);
     padding: 40px 0;
 }
+
 .checkout {
-  width: 100%;              /* full ngang */
-  margin-top: 20px;
+    width: 91% !important; 
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 14px;
 
-  padding: 15px;
-  border-radius: 14px;
+    position: relative;          /* quan trọng */
+    display: flex;
+    justify-content: center;
+    align-items: center;
 
-  display: flex;
-  justify-content: center;
-  align-items: center;
+    background: linear-gradient(90deg, #2563eb, #4f46e5);
+    color: white;
+    font-weight: 500;
+    font-size: 15px;
+    text-decoration: none;
+}
 
-  background: linear-gradient(90deg,#2563eb,#4f46e5);
-  color: white;
-  font-weight: 500;
-  font-size: 15px;
+/* icon luôn nằm bên phải */
+.checkout .icon {
+    position: absolute;
+    right: 20px;
+}.checkout {
+    width: 100%;
+    margin-top: 20px;
 
-  text-decoration: none;
-  transition: 0.3s;
+    padding: 15px;
+    border-radius: 14px;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    /* khoảng cách text - icon */
+
+    background: linear-gradient(90deg, #2563eb, #4f46e5);
+    color: white;
+    font-weight: 500;
+    font-size: 15px;
+
+    text-decoration: none;
 }
 
 .checkout:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(79,70,229,0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(79, 70, 229, 0.3);
 }
 
 .container {

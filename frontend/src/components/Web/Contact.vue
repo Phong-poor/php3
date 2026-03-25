@@ -61,14 +61,15 @@ const infos = [
 </script>
 
 <template>
-   <Header />
+    <Header />
     <div class="page">
 
         <!-- HERO -->
         <section class="hero">
             <span class="hero-badge">Liên hệ với chúng tôi</span>
             <h1>Chúng tôi luôn sẵn sàng<br /><span class="gradient-text">hỗ trợ bạn</span></h1>
-            <p>Kết nối với đội ngũ chuyên gia VinaTech để nhận tư vấn và giải pháp công nghệ tối ưu cho doanh nghiệp và cá nhân.</p>
+            <p>Kết nối với đội ngũ chuyên gia VinaTech để nhận tư vấn và giải pháp công nghệ tối ưu cho doanh nghiệp và
+                cá nhân.</p>
         </section>
 
         <!-- MAIN -->
@@ -133,15 +134,14 @@ const infos = [
 
                         <!-- MAP -->
                         <a :href="mapLink" target="_blank" class="map-card">
-                            <iframe
-                                src="https://www.google.com/maps?q=123+Đường+Công+Nghệ+Quận+1+TPHCM&output=embed"
-                                loading="lazy"
-                            ></iframe>
+                            <iframe src="https://www.google.com/maps?q=123+Đường+Công+Nghệ+Quận+1+TPHCM&output=embed"
+                                loading="lazy"></iframe>
                             <div class="map-overlay">
                                 <span>
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                                        <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"/>
-                                        <circle cx="12" cy="10" r="3"/>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round">
+                                        <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z" />
+                                        <circle cx="12" cy="10" r="3" />
                                     </svg>
                                     Xem bản đồ chi tiết →
                                 </span>
@@ -160,7 +160,9 @@ const infos = [
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
 .page {
     font-family: 'Inter', sans-serif;
@@ -235,18 +237,49 @@ const infos = [
     border-radius: 20px;
     padding: 36px;
     border: 1px solid #f1f5f9;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
 }
 
-.form-top { margin-bottom: 28px; }
-.form-top h3 { font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 6px; }
-.form-top p  { font-size: 13px; color: #94a3b8; margin: 0; }
+.form-top {
+    margin-bottom: 28px;
+}
 
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-top h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 6px;
+}
 
-.input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-.input-group label { font-size: 12px; font-weight: 600; color: #475569; letter-spacing: 0.02em; }
-.req { color: #ef4444; }
+.form-top p {
+    font-size: 13px;
+    color: #94a3b8;
+    margin: 0;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.input-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    letter-spacing: 0.02em;
+}
+
+.req {
+    color: #ef4444;
+}
 
 .input-group input,
 .input-group textarea {
@@ -266,14 +299,32 @@ const infos = [
 .input-group textarea:focus {
     border-color: #4f46e5;
     background: white;
-    box-shadow: 0 0 0 3px rgba(79,70,229,0.08);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
 }
 
-.input-group textarea { height: 130px; resize: vertical; }
+.input-group textarea {
+    height: 130px;
+    resize: vertical;
+}
 
-.msg { font-size: 13px; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
-.msg.error   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-.msg.success { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.msg {
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+.msg.error {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.msg.success {
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+}
 
 .submit-btn {
     width: 100%;
@@ -292,41 +343,98 @@ const infos = [
     gap: 8px;
     letter-spacing: 0.02em;
 }
-.submit-btn:hover:not(:disabled) { opacity: 0.92; transform: translateY(-1px); }
-.submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.submit-btn:hover:not(:disabled) {
+    opacity: 0.92;
+    transform: translateY(-1px);
+}
+
+.submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 
 .spinner {
-    width: 16px; height: 16px; border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.3);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
     border-top-color: white;
     animation: spin 0.7s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 
 /* INFO COL */
-.info-col { display: flex; flex-direction: column; gap: 16px; }
+.info-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
 
 .info-card {
     background: white;
     border-radius: 20px;
     padding: 28px;
     border: 1px solid #f1f5f9;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
 }
-.info-card h3 { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 20px; }
 
-.info-list { display: flex; flex-direction: column; gap: 16px; }
-.info-item { display: flex; gap: 12px; align-items: flex-start; }
+.info-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 20px;
+}
+
+.info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.info-item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
 
 .info-icon {
-    width: 42px; height: 42px; border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
 }
 
-.info-label { font-size: 11px; font-weight: 600; color: #94a3b8; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 3px; }
-.info-val { font-size: 13px; color: #334155; margin: 0; line-height: 1.5; }
-.info-val.bold { font-size: 16px; font-weight: 700; color: #0f172a; }
+.info-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 0 0 3px;
+}
+
+.info-val {
+    font-size: 13px;
+    color: #334155;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.info-val.bold {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+}
 
 /* MAP */
 .map-card {
@@ -335,30 +443,66 @@ const infos = [
     overflow: hidden;
     position: relative;
     border: 1px solid #f1f5f9;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
     text-decoration: none;
     transition: transform 0.2s, box-shadow 0.2s;
 }
-.map-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
-.map-card iframe { width: 100%; height: 175px; border: none; display: block; }
+
+.map-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.map-card iframe {
+    width: 100%;
+    height: 175px;
+    border: none;
+    display: block;
+}
 
 .map-overlay {
-    position: absolute; bottom: 0; left: 0; right: 0;
-    background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
     padding: 20px 16px 12px;
 }
+
 .map-overlay span {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: white; padding: 7px 14px; border-radius: 20px;
-    font-size: 12px; font-weight: 600; color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: white;
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0f172a;
 }
-.map-overlay svg { width: 13px; height: 13px; color: #4f46e5; }
+
+.map-overlay svg {
+    width: 13px;
+    height: 13px;
+    color: #4f46e5;
+}
 
 /* RESPONSIVE */
 @media (max-width: 768px) {
-    .hero h1 { font-size: 30px; }
-    .contact-grid { grid-template-columns: 1fr; }
-    .form-row { grid-template-columns: 1fr; }
-    .form-card { padding: 24px; }
+    .hero h1 {
+        font-size: 30px;
+    }
+
+    .contact-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .form-card {
+        padding: 24px;
+    }
 }
 </style>

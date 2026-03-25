@@ -1,12 +1,9 @@
-<script setup>
-import MainLayout from './components/Layout/MainLayout.vue'
-</script>
-
 <template>
-  <MainLayout />
+  <router-view />
 </template>
+
 <style>
-  body{
-    margin: 0;
-  }
+body {
+  margin: 0;
+}
 </style>
