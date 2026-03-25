@@ -43,8 +43,8 @@ class DanhMucController extends Controller
         }
 
         $validated = $request->validate([
-            'ten_danhmuc' => 'sometimes|required|string|max:255',
-            'trangthai'  => 'sometimes|required|in:active,hidden'
+            'ten_danhmuc' => 'required|string|max:255',
+            'trangthai'  => 'required|in:active,hidden'
         ]);
 
         

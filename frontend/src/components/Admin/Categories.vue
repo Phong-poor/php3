@@ -43,8 +43,8 @@
               
             </td>
             <td>
-              <span class="status-badge" :class="dm.trang_thai === 'active' ? 'status-active' : 'status-hidden'">
-                {{ dm.trang_thai === 'active' ? 'Hoạt động' : 'Tạm ẩn' }}
+              <span :class="dm.trangthai === 'active' ? 'status-active' : 'status-hidden'">
+                {{ dm.trangthai === 'active' ? 'Hoạt động' : 'Tạm ẩn' }}
               </span>
             </td>
             <td>
