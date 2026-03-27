@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class danhmucModel extends Model
+class DanhMuc extends Model
 {
     public $timestamps = false;
     protected $table = 'danhmuc';

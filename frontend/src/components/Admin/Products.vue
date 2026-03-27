@@ -1,187 +1,665 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import axios from 'axios'
+
+const api = axios.create({
+  baseURL: 'http://127.0.0.1:8000/api',
+})
 
 /* ═══════════════════════════════════════
    DANH SÁCH SẢN PHẨM
 ═══════════════════════════════════════ */
 const searchQuery = ref('')
 const selectedStatus = ref('')
+const selectedCategory = ref('')
 
-const products = ref([
-  { name: 'VinaPro Laptop X1', sku: 'VN-LP-2026', category: 'Máy tính xách tay', price: '45.990.000', stock: 124, status: 'Đang bán', img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200' },
-  { name: 'VinaPhone Ultra S', sku: 'VN-PH-2026', category: 'Điện thoại', price: '22.500.000', stock: 12, status: 'Nháp', img: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=200' },
-  { name: 'VinaTab Air G3', sku: 'VN-TB-2026', category: 'Máy tính bảng', price: '15.200.000', stock: 56, status: 'Đang bán', img: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=200' },
-  { name: 'VinaSound Studio H1', sku: 'VN-AC-2026', category: 'Phụ kiện', price: '5.800.000', stock: 210, status: 'Đang bán', img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200' },
-])
+const currentPage = ref(1)
+const PER_PAGE = 10
 
+const products = ref([])
+const categories = ref([])
+const brands = ref([])
+const colors = ref([])
+const readingExtraImages = ref(false)
+const variantLoading = ref(false)
 const filteredProducts = computed(() =>
   products.value.filter(p => {
     const s = searchQuery.value.toLowerCase()
+
     return (!s || p.name.toLowerCase().includes(s) || p.sku.toLowerCase().includes(s))
       && (!selectedStatus.value || p.status === selectedStatus.value)
+      && (!selectedCategory.value || String(p.categoryId) === String(selectedCategory.value))
   })
 )
-const stockPercent = s => Math.min((s / 250) * 100, 100)
-const removeProduct = i => products.value.splice(i, 1)
 
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredProducts.value.length / PER_PAGE))
+)
+
+const paginatedProducts = computed(() => {
+  const start = (currentPage.value - 1) * PER_PAGE
+  return filteredProducts.value.slice(start, start + PER_PAGE)
+})
+
+const pageItems = computed(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+
+  if (current <= 3) {
+    return [1, 2, 3, '...', total - 2, total - 1, total]
+  }
+
+  if (current >= total - 2) {
+    return [1, 2, 3, '...', total - 2, total - 1, total]
+  }
+
+  return [1, '...', current - 1, current, current + 1, '...', total]
+})
+
+const goToPage = (page) => {
+  if (page < 1) {
+    currentPage.value = 1
+    return
+  }
+  if (page > totalPages.value) {
+    currentPage.value = totalPages.value
+    return
+  }
+  currentPage.value = page
+}
+
+watch([searchQuery, selectedStatus, selectedCategory], () => {
+  currentPage.value = 1
+})
+
+const getErrorMessage = (error, fallback) => {
+  if (error?.response?.data?.message) return error.response.data.message
+
+  const errors = error?.response?.data?.errors
+  if (errors && typeof errors === 'object') {
+    const firstKey = Object.keys(errors)[0]
+    if (firstKey && Array.isArray(errors[firstKey]) && errors[firstKey][0]) {
+      return errors[firstKey][0]
+    }
+  }
+
+  return fallback
+}
+
+const fetchProducts = async () => {
+  try {
+    const res = await api.get('/sanpham')
+
+    products.value = res.data.map(p => {
+      const variantCount = Array.isArray(p.bien_thes) ? p.bien_thes.length : 0
+
+      return {
+        id: p.id_sanpham,
+        name: p.tenSP,
+        sku: p.SKU || '',
+        category: p.danh_muc?.ten_danhmuc || 'Chưa có danh mục',
+        categoryId: p.id_danhmuc ?? '',
+        brand: p.thuong_hieu?.ten_thuonghieu || 'Chưa có thương hiệu',
+        totalVariants: variantCount,
+        status: String(p.trangthai) === '1' ? 'Đang bán' : 'Nháp',
+        img: p.hinhanh
+          ? `http://127.0.0.1:8000/storage/${p.hinhanh}`
+          : 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200',
+      }
+    })
+  } catch (error) {
+    formError.value = getErrorMessage(error, 'Không tải được danh sách sản phẩm.')
+  }
+}
+
+const fetchCategories = async () => {
+  try {
+    const res = await api.get('/danhmuc')
+
+    categories.value = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.data)
+        ? res.data.data
+        : []
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const fetchBrands = async () => {
+  try {
+    const res = await api.get('/thuonghieu')
+
+    brands.value = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.data)
+        ? res.data.data
+        : []
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const fetchColors = async () => {
+  try {
+    const res = await api.get('/colors')
+
+    colors.value = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.data)
+        ? res.data.data
+        : []
+
+    buildAttributeGroups()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const removeProduct = async (id) => {
+  try {
+    await api.delete(`/sanpham/${id}`)
+    await fetchProducts()
+  } catch (error) {
+    formError.value = getErrorMessage(error, 'Không xóa được sản phẩm.')
+  }
+}
+const resetForm = () => {
+  form.value = defaultForm()
+  imgPreview.value = ''
+  extraImagePreviews.value = []
+  formError.value = ''
+
+  vsPhase.value = 1
+  selectedOptions.value = {}
+  generatedRows.value = []
+  editVariantHeaders.value = []
+  bulkPrice.value = ''
+  bulkStock.value = ''
+
+  selectedGroupId.value = attributeGroups.value.length > 0
+    ? attributeGroups.value[0].id
+    : null
+
+  if (fileInputRef.value) fileInputRef.value.value = ''
+  if (extraFileInputRef.value) extraFileInputRef.value.value = ''
+}
+const parseVariantName = (name) => {
+  if (!name) return {}
+  const parts = String(name).split(' - ')
+  const obj = {}
+
+  parts.forEach((part, index) => {
+    obj[`attr_${index}`] = part
+  })
+
+  return obj
+}
 /* ═══════════════════════════════════════
-   DỮ LIỆU NHÓM & LOẠI THUỘC TÍNH
-   Logic: chọn 1 NHÓM → hiện TẤT CẢ loại
-   thuộc tính của nhóm đó thành CỘT trong
-   bảng biến thể. Mỗi DÒNG = 1 cấu hình
-   đầy đủ (CPU + RAM + SSD + GPU + ...)
+   NHÓM THUỘC TÍNH & LOẠI THUỘC TÍNH
 ═══════════════════════════════════════ */
-const attributeGroups = ref([
-  {
-    id: 1, name: 'Cấu hình Laptop', icon: '💻',
-    attrTypes: [
-      { id: 'cpu', label: 'CPU', options: ['Intel Core i5-13500H', 'Intel Core i7-13700H', 'Intel Core i9-14900H', 'Apple M3', 'Apple M3 Pro', 'Apple M3 Max', 'AMD Ryzen 5 7535HS', 'AMD Ryzen 7 7745HX'] },
-      { id: 'ram', label: 'RAM', options: ['8GB DDR5', '16GB DDR5', '32GB DDR5', '64GB DDR5', '16GB Unified', '32GB Unified', '48GB Unified', '96GB Unified'] },
-      { id: 'ssd', label: 'SSD', options: ['256GB NVMe', '512GB NVMe', '1TB NVMe Gen5', '2TB NVMe Gen5'] },
-      { id: 'gpu', label: 'GPU', options: ['Intel Iris Xe', 'NVIDIA RTX 4060', 'NVIDIA RTX 4070', 'NVIDIA RTX 4080', 'NVIDIA RTX 4090', 'AMD Radeon RX 7600M', 'Apple GPU 18-core', 'Apple GPU 40-core'] },
-      { id: 'os', label: 'OS', options: ['Windows 11 Home', 'Windows 11 Pro', 'macOS Sonoma', 'Ubuntu 24.04', 'Không có OS'] },
-    ]
-  },
-  {
-    id: 2, name: 'Điện thoại', icon: '📱',
-    attrTypes: [
-      { id: 'chip', label: 'Chip', options: ['Snapdragon 8 Gen 3', 'Dimensity 9300', 'Apple A17 Pro', 'Apple A16 Bionic', 'Exynos 2400'] },
-      { id: 'ram', label: 'RAM', options: ['8GB', '12GB', '16GB'] },
-      { id: 'storage', label: 'Bộ nhớ', options: ['128GB', '256GB', '512GB', '1TB'] },
-      { id: 'network', label: 'Mạng', options: ['4G LTE', '5G Sub-6', '5G mmWave'] },
-    ]
-  },
-  {
-    id: 3, name: 'Máy tính bảng', icon: '📟',
-    attrTypes: [
-      { id: 'chip', label: 'Chip', options: ['Apple M2', 'Apple M4', 'Snapdragon 8s Gen 3', 'Dimensity 9000'] },
-      { id: 'ram', label: 'RAM', options: ['8GB', '16GB', '32GB'] },
-      { id: 'storage', label: 'Bộ nhớ', options: ['128GB', '256GB', '512GB', '1TB', '2TB'] },
-      { id: 'connect', label: 'Kết nối', options: ['WiFi only', 'WiFi + 5G', 'WiFi + 4G'] },
-      { id: 'screen', label: 'Màn hình', options: ['11 inch LCD', '11 inch OLED', '13 inch OLED', '13 inch Mini-LED'] },
-    ]
-  },
-  {
-    id: 4, name: 'Phụ kiện', icon: '🖱️',
-    attrTypes: [
-      { id: 'type', label: 'Loại', options: ['Chuột không dây', 'Chuột có dây', 'Bàn phím cơ', 'Bàn phím mỏng', 'Tai nghe over-ear', 'Tai nghe in-ear', 'Màn hình', 'Loa bluetooth'] },
-      { id: 'conn', label: 'Kết nối', options: ['USB-A', 'USB-C', 'Bluetooth 5.0', 'Bluetooth 5.3', '2.4GHz Dongle', '3.5mm Jack', 'Thunderbolt 4'] },
-    ]
-  },
-])
+const baseAttributeGroups = ref([])
+const attributeGroups = ref([])
 
-const colorList = ref([
-  { id: 1, name: 'Space Black', hex: '#1a1a1a' },
-  { id: 2, name: 'Silver', hex: '#C0C0C0' },
-  { id: 3, name: 'Midnight', hex: '#1c2951' },
-  { id: 4, name: 'Starlight', hex: '#e8dcc8' },
-  { id: 5, name: 'Rose Gold', hex: '#c9768f' },
-  { id: 6, name: 'Pacific Blue', hex: '#1f4f8a' },
-  { id: 7, name: 'Alpine Green', hex: '#4a7c59' },
-  { id: 8, name: 'Purple', hex: '#7c3aed' },
-])
+const groupIconMap = {
+  'Cấu hình': '💻',
+  'Màn hình': '🖥️',
+  'Pin & Sạc': '🔋',
+  'Kết nối': '📡',
+  'Phụ kiện': '🖱️',
+  'Màu sắc': '🎨',
+}
 
-const colorHex = name => colorList.value.find(c => c.name === name)?.hex || '#cbd5e1'
+const colorPool = ['blue', 'green', 'amber', 'pink', 'purple', 'teal']
+
+const getGroupIcon = (name) => {
+  return groupIconMap[name] || '📦'
+}
+
+const getTypeColor = (name) => {
+  if (!name) return 'blue'
+  const index =
+    String(name)
+      .split('')
+      .reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % colorPool.length
+
+  return colorPool[index]
+}
+
+const buildAttributeGroups = () => {
+  const colorGroup =
+    colors.value.length > 0
+      ? {
+          id: 'color-group',
+          name: 'Màu sắc',
+          icon: getGroupIcon('Màu sắc'),
+          attrTypes: [
+            {
+              id: 'color-type',
+              label: 'Màu sắc',
+              color: 'pink',
+              options: colors.value.map((c) => ({
+                label: c.name,
+                value: c.name,
+                hex: c.hex_code,
+              })),
+            },
+          ],
+        }
+      : null
+
+  attributeGroups.value = colorGroup
+    ? [...baseAttributeGroups.value, colorGroup]
+    : [...baseAttributeGroups.value]
+
+  if (!selectedGroupId.value && attributeGroups.value.length > 0) {
+    selectedGroupId.value = attributeGroups.value[0].id
+  }
+}
+
+const normalizeAttributeGroups = (payload) => {
+  const nhoms = Array.isArray(payload) ? payload : []
+
+  baseAttributeGroups.value = nhoms.map((group) => {
+    const thuocTinhs = Array.isArray(group.thuoc_tinhs)
+      ? group.thuoc_tinhs
+      : Array.isArray(group.thuocTinhs)
+        ? group.thuocTinhs
+        : []
+
+    return {
+      id: group.id_nhom,
+      name: group.ten_nhom,
+      icon: getGroupIcon(group.ten_nhom),
+      attrTypes: thuocTinhs.map((attr) => {
+        const giaTris = Array.isArray(attr.giatri_thuoc_tinhs)
+          ? attr.giatri_thuoc_tinhs
+          : Array.isArray(attr.giatriThuocTinhs)
+            ? attr.giatriThuocTinhs
+            : []
+
+        return {
+          id: attr.id_thuoctinh,
+          label: attr.ten_thuoctinh,
+          color: getTypeColor(attr.ten_thuoctinh),
+          options: giaTris.map((item) => item.giatri),
+        }
+      }),
+    }
+  })
+
+  buildAttributeGroups()
+}
+
+const fetchAttributeGroups = async () => {
+  variantLoading.value = true
+
+  try {
+    const res = await api.get('/thuoctinh-all')
+    normalizeAttributeGroups(res.data)
+
+    if (!selectedGroupId.value && attributeGroups.value.length > 0) {
+      selectedGroupId.value = attributeGroups.value[0].id
+    }
+  } catch (error) {
+    formError.value = getErrorMessage(error, 'Không tải được dữ liệu biến thể.')
+  } finally {
+    variantLoading.value = false
+  }
+}
 
 /* ═══════════════════════════════════════
    MODAL & FORM
 ═══════════════════════════════════════ */
 const showModal = ref(false)
 const formError = ref('')
+const isEditMode = ref(false)
+const editingProductId = ref(null)
 const imgPreview = ref('')
 const fileInputRef = ref(null)
+const extraFileInputRef = ref(null)
+const extraImagePreviews = ref([])
 
-const defaultForm = () => ({ name: '', sku: '', category: '', price: '', stock: '', status: 'Đang bán', img: '' })
+const defaultForm = () => ({
+  name: '',
+  category: '',
+  brand: '',
+  status: 'Đang bán',
+  img: '',
+  images: [],
+  weight: '',
+})
+
 const form = ref(defaultForm())
 
 const onFileChange = e => {
-  const file = e.target.files[0]; if (!file) return
+  const file = e.target.files[0]
+  if (!file) return
+
   const r = new FileReader()
-  r.onload = ev => { imgPreview.value = ev.target.result; form.value.img = ev.target.result }
+  r.onload = ev => {
+    imgPreview.value = ev.target.result
+    form.value.img = ev.target.result
+  }
   r.readAsDataURL(file)
 }
-const triggerFileInput = () => fileInputRef.value.click()
+
+const onExtraFilesChange = async (e) => {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+
+  readingExtraImages.value = true
+
+  try {
+    const base64Images = await Promise.all(
+      files.map(file => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader()
+
+          reader.onload = (ev) => resolve(ev.target.result)
+          reader.onerror = () => reject(new Error('Không đọc được file ảnh'))
+
+          reader.readAsDataURL(file)
+        })
+      })
+    )
+
+    form.value.images = [...form.value.images, ...files]
+    extraImagePreviews.value = [...extraImagePreviews.value, ...base64Images]
+  } catch (error) {
+    console.error(error)
+    alert('Không đọc được một hoặc nhiều ảnh phụ')
+  } finally {
+    readingExtraImages.value = false
+
+    if (extraFileInputRef.value) {
+      extraFileInputRef.value.value = ''
+    }
+  }
+}
+
+const triggerFileInput = () => fileInputRef.value?.click()
+const triggerExtraFileInput = () => extraFileInputRef.value?.click()
+
 const removeImg = () => {
-  imgPreview.value = ''; form.value.img = ''
+  imgPreview.value = ''
+  form.value.img = ''
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
-/* ═══════════════════════════════════════
-   VARIANT STATE
-   variantStep: 1 = chọn nhóm  |  2 = bảng
-   Mỗi dòng variantRows = {
-     id, attrs: { [typeId]: 'giá trị' },
-     color, price, stock, sku
-   }
-═══════════════════════════════════════ */
-const variantStep = ref(1)
-const selectedGroupId = ref(null)
-const variantRows = ref([])
+const removeExtraImage = index => {
+  extraImagePreviews.value.splice(index, 1)
+  form.value.images.splice(index, 1)
 
-const activeGroup = computed(() =>
+  if (form.value.images.length === 0 && extraFileInputRef.value) {
+    extraFileInputRef.value.value = ''
+  }
+}
+
+/* ═══════════════════════════════════════
+   VARIANT STATE — FLAT TABLE + COMBO FLOW
+═══════════════════════════════════════ */
+const vsPhase = ref(1)
+const selectedGroupId = ref(null)
+const selectedOptions = ref({})
+const generatedRows = ref([])
+const editVariantHeaders = ref([])
+const bulkPrice = ref('')
+const bulkStock = ref('')
+
+const selectedGroup = computed(() =>
   attributeGroups.value.find(g => g.id === selectedGroupId.value) || null
 )
 
-const makeEmptyRow = () => {
-  const attrs = {}
-  activeGroup.value?.attrTypes.forEach(t => { attrs[t.id] = '' })
-  return { id: Date.now() + Math.random(), attrs, color: '', price: '', stock: 0, sku: '' }
-}
+const allAttrTypes = computed(() => {
+  return attributeGroups.value.flatMap(group =>
+    (group.attrTypes || []).map(type => ({
+      ...type,
+      groupId: group.id,
+      groupName: group.name,
+    }))
+  )
+})
 
-const goStep2 = groupId => {
+const activeAttrTypes = computed(() => {
+  return allAttrTypes.value.filter(
+    t => selectedOptions.value[t.id]?.size > 0
+  )
+})
+const tableHeaders = computed(() => {
+  if (!isEditMode.value) return activeAttrTypes.value
+
+  return editVariantHeaders.value.map((label, index) => ({
+    id: `attr_${index}`,
+    label,
+    color: colorPool[index % colorPool.length],
+  }))
+})
+const totalSelected = computed(() =>
+  Object.values(selectedOptions.value).reduce((s, set) => s + (set?.size ?? 0), 0)
+)
+
+const comboCount = computed(() => {
+  if (activeAttrTypes.value.length === 0) return 0
+  return activeAttrTypes.value.reduce(
+    (prod, t) => prod * (selectedOptions.value[t.id]?.size ?? 0),
+    1
+  )
+})
+
+const selectGroup = groupId => {
+  if (selectedGroupId.value === groupId) return
   selectedGroupId.value = groupId
-  const g = attributeGroups.value.find(x => x.id === groupId)
-  const attrs = {}
-  g?.attrTypes.forEach(t => { attrs[t.id] = '' })
-  variantRows.value = [{ id: Date.now(), attrs, color: '', price: '', stock: 0, sku: '' }]
-  variantStep.value = 2
 }
 
-const backStep1 = () => { variantStep.value = 1; selectedGroupId.value = null }
+const displayAttrTypes = computed(() => {
+  if (!selectedGroup.value) return []
+  return selectedGroup.value.attrTypes || []
+})
 
-const addVariantRow = () => variantRows.value.push(makeEmptyRow())
-const removeVariantRow = i => { if (variantRows.value.length > 1) variantRows.value.splice(i, 1) }
+const getOptionValue = (opt) => typeof opt === 'object' ? opt.value : opt
+const getOptionLabel = (opt) => typeof opt === 'object' ? opt.label : opt
+const getOptionHex = (opt) => typeof opt === 'object' ? opt.hex : null
 
-// Nhân bản dòng – copy toàn bộ attrs, chỉ reset stock về 0
-const cloneRow = i => {
-  const src = variantRows.value[i]
-  variantRows.value.splice(i + 1, 0, {
-    id: Date.now() + Math.random(),
-    attrs: { ...src.attrs },
-    color: src.color, price: src.price, stock: 0, sku: ''
+const toggleOption = (typeId, value) => {
+  if (!selectedOptions.value[typeId]) selectedOptions.value[typeId] = new Set()
+  const set = selectedOptions.value[typeId]
+  if (set.has(value)) set.delete(value)
+  else set.add(value)
+  selectedOptions.value = { ...selectedOptions.value }
+}
+
+const isSelected = (typeId, value) =>
+  selectedOptions.value[typeId]?.has(value) ?? false
+
+const selectedCountInGroup = g =>
+  g.attrTypes.reduce((s, t) => s + (selectedOptions.value[t.id]?.size ?? 0), 0)
+
+const cartesian = arrays => {
+  if (arrays.length === 0) return [[]]
+  const [first, ...rest] = arrays
+  const tail = cartesian(rest)
+  return first.flatMap(v => tail.map(c => [v, ...c]))
+}
+
+const generateVariants = () => {
+  if (!activeAttrTypes.value.length) return
+  const arrays = activeAttrTypes.value.map(t => [...selectedOptions.value[t.id]])
+  const combos = cartesian(arrays)
+  generatedRows.value = combos.map((combo, i) => {
+    const attrs = {}
+    activeAttrTypes.value.forEach((t, ti) => { attrs[t.id] = combo[ti] })
+    return { id: Date.now() + i, attrs, price: '', stock: 0 }
+  })
+  vsPhase.value = 2
+}
+
+const backToSelect = () => { vsPhase.value = 1 }
+const removeRow = i => { if (generatedRows.value.length > 1) generatedRows.value.splice(i, 1) }
+
+const applyBulkAll = () => {
+  generatedRows.value.forEach(r => {
+    if (bulkPrice.value) r.price = bulkPrice.value
+    if (bulkStock.value !== '') r.stock = Number(bulkStock.value)
   })
 }
 
 /* ═══════════════════════════════════════
    OPEN / CLOSE / SUBMIT
 ═══════════════════════════════════════ */
+const openEditModal = async (id) => {
+  try {
+    formError.value = ''
+    resetForm()
+
+    const res = await api.get(`/sanpham/${id}`)
+    const product = res.data
+
+    isEditMode.value = true
+    editingProductId.value = id
+
+    mapProductToForm(product)
+    showModal.value = true
+  } catch (error) {
+    console.error(error)
+    alert(getErrorMessage(error, 'Không tải được thông tin sản phẩm để sửa.'))
+  }
+}
+const mapProductToForm = (product) => {
+  form.value = {
+    name: product?.tenSP || '',
+    category: product?.id_danhmuc ? String(product.id_danhmuc) : '',
+    brand: product?.id_thuonghieu ? String(product.id_thuonghieu) : '',
+    status: String(product?.trangthai) === '1' ? 'Đang bán' : 'Nháp',
+    img: '',
+    images: [],
+    weight: product?.khoiluong ?? '',
+  }
+
+  imgPreview.value = product?.hinhanh
+    ? `http://127.0.0.1:8000/storage/${product.hinhanh}`
+    : ''
+
+  extraImagePreviews.value = Array.isArray(product?.hinh_anhs)
+    ? product.hinh_anhs.map(img => `http://127.0.0.1:8000/storage/${img.duongdan}`)
+    : []
+
+  const bienThes = Array.isArray(product?.bien_thes) ? product.bien_thes : []
+
+  generatedRows.value = bienThes.map((row, i) => {
+    const parts = String(row.ten_bienthe || '').split(' - ').filter(Boolean)
+
+    const attrs = {}
+    parts.forEach((part, index) => {
+      attrs[`attr_${index}`] = part
+    })
+
+    return {
+      id: row.id_bienthe ?? Date.now() + i,
+      attrs,
+      price: row.gia ?? '',
+      stock: row.soluong ?? 0,
+      ten_bienthe: row.ten_bienthe ?? '',
+      isExisting: true,
+    }
+  })
+
+  const maxParts = bienThes.reduce((max, row) => {
+    const count = String(row.ten_bienthe || '').split(' - ').filter(Boolean).length
+    return Math.max(max, count)
+  }, 0)
+
+  editVariantHeaders.value = Array.from({ length: maxParts }, (_, i) => `Thuộc tính ${i + 1}`)
+
+  selectedOptions.value = {}
+  vsPhase.value = 2
+}
 const openModal = () => {
-  form.value = defaultForm(); imgPreview.value = ''; formError.value = ''
-  variantStep.value = 1; selectedGroupId.value = null; variantRows.value = []
+  form.value = defaultForm()
+  imgPreview.value = ''
+  extraImagePreviews.value = []
+  formError.value = ''
+
+  vsPhase.value = 1
+  selectedOptions.value = {}
+  generatedRows.value = []
+  bulkPrice.value = ''
+  bulkStock.value = ''
+  isEditMode.value = false
+  editingProductId.value = null
+  resetForm()
+  showModal.value = true
+  selectedGroupId.value = null
+
+  if (attributeGroups.value.length > 0) {
+    selectedGroupId.value = attributeGroups.value[0].id
+  }
+
+  if (fileInputRef.value) fileInputRef.value.value = ''
+  if (extraFileInputRef.value) extraFileInputRef.value.value = ''
+
   showModal.value = true
 }
+
 const closeModal = () => { showModal.value = false }
 
-const submitForm = () => {
-  if (!form.value.name.trim()) { formError.value = 'Vui lòng nhập tên sản phẩm.'; return }
-  if (!form.value.sku.trim()) { formError.value = 'Vui lòng nhập SKU.'; return }
-  if (!form.value.category) { formError.value = 'Vui lòng chọn danh mục.'; return }
-  if (!form.value.price.trim()) { formError.value = 'Vui lòng nhập giá.'; return }
-  if (!form.value.stock) { formError.value = 'Vui lòng nhập số lượng kho.'; return }
-  products.value.unshift({
-    name: form.value.name.trim(), sku: form.value.sku.trim(),
-    category: form.value.category, price: form.value.price.trim(),
-    stock: Number(form.value.stock), status: form.value.status,
-    img: form.value.img || 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200'
-  })
-  closeModal()
+const submitForm = async () => {
+  try {
+    const payload = {
+      id_danhmuc: Number(form.value.category),
+      id_thuonghieu: Number(form.value.brand),
+      tenSP: form.value.name.trim(),
+      trangthai: form.value.status === 'Đang bán' ? 1 : 0,
+      hinhanh: form.value.img || imgPreview.value || '',
+      khoiluong: form.value.weight ? Number(form.value.weight) : null,
+
+      hinh_anhs: extraImagePreviews.value.map((img, index) => ({
+        duongdan: img,
+        thutu: index,
+      })),
+
+      bienthes: generatedRows.value.map((row) => ({
+        ten_bienthe: row.ten_bienthe || Object.values(row.attrs || {}).join(' - '),
+        gia: Number(row.price) || 0,
+        soluong: Number(row.stock) || 0,
+      })),
+    }
+
+    if (isEditMode.value && editingProductId.value) {
+      await api.put(`/sanpham/${editingProductId.value}`, payload)
+      alert('Cập nhật sản phẩm thành công')
+    } else {
+      await api.post('/sanpham', payload)
+      alert('Thêm sản phẩm thành công')
+    }
+
+    await fetchProducts()
+    resetForm()
+    closeModal()
+  } catch (error) {
+    console.error(error)
+    alert(getErrorMessage(error, isEditMode.value
+      ? 'Có lỗi xảy ra khi cập nhật sản phẩm'
+      : 'Có lỗi xảy ra khi thêm sản phẩm'))
+  }
 }
+
+onMounted(() => {
+  fetchProducts()
+  fetchCategories()
+  fetchBrands()
+  fetchAttributeGroups()
+  fetchColors()
+})
 </script>
 
 <template>
   <div class="admin">
 
-    <!-- HEADER -->
     <div class="top">
       <div>
         <h1>Quản lý sản phẩm</h1>
@@ -190,7 +668,6 @@ const submitForm = () => {
       <button class="add-btn" @click="openModal">+ Thêm sản phẩm</button>
     </div>
 
-    <!-- STATS -->
     <div class="stats">
       <div class="stat-card"><span class="stat-icon blue">📦</span>
         <div>
@@ -214,7 +691,6 @@ const submitForm = () => {
       </div>
     </div>
 
-    <!-- FILTER -->
     <div class="filter-bar">
       <div class="search-wrap">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -229,33 +705,39 @@ const submitForm = () => {
         <option>Đang bán</option>
         <option>Nháp</option>
       </select>
-      <select>
-        <option>Tất cả danh mục</option>
-        <option>Máy tính xách tay</option>
-        <option>Điện thoại</option>
-        <option>Máy tính bảng</option>
-        <option>Phụ kiện</option>
+      <select v-model="selectedCategory">
+        <option value="">Tất cả danh mục</option>
+        <option
+          v-for="category in categories"
+          :key="category.id_danhmuc"
+          :value="category.id_danhmuc"
+        >
+          {{ category.ten_danhmuc }}
+        </option>
       </select>
     </div>
 
-    <!-- TABLE -->
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
+            <th>STT</th>
             <th>Sản phẩm</th>
             <th>Danh mục</th>
-            <th>Giá niêm yết</th>
-            <th>Kho hàng</th>
+            <th>Thương hiệu</th>
+            <th>Tổng biến thể</th>
             <th>Trạng thái</th>
             <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!filteredProducts.length">
-            <td colspan="6" class="empty">Không tìm thấy sản phẩm nào.</td>
+          <tr v-if="!paginatedProducts.length">
+            <td colspan="7" class="empty">Không tìm thấy sản phẩm nào.</td>
           </tr>
-          <tr v-for="(p, i) in filteredProducts" :key="i">
+          <tr v-for="(p, i) in paginatedProducts" :key="p.id">
+            <td>
+              {{ (currentPage - 1) * PER_PAGE + i + 1 }}
+            </td>
             <td>
               <div class="product-cell">
                 <img :src="p.img" :alt="p.name" />
@@ -263,31 +745,23 @@ const submitForm = () => {
               </div>
             </td>
             <td><span class="badge">{{ p.category }}</span></td>
-            <td><span class="price">{{ p.price }} ₫</span></td>
+            <td><span class="price">{{ p.brand }}</span></td>
             <td>
               <div class="stock-cell">
-                <span>{{ p.stock }}</span>
-                <div class="bar">
-                  <div class="fill" :style="{ width: stockPercent(p.stock) + '%' }"></div>
-                </div>
+                <span>{{ p.totalVariants }} biến thể</span>
               </div>
             </td>
-            <td><span class="status-badge" :class="p.status === 'Đang bán' ? 'active' : 'draft'">{{ p.status }}</span></td>
+            <td><span class="status-badge" :class="p.status === 'Đang bán' ? 'active' : 'draft'">{{ p.status }}</span>
+            </td>
             <td>
               <div class="actions">
-                <button class="act-btn" title="Xem">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                </button>
-                <button class="act-btn" title="Sửa">
+                <button class="act-btn" title="Sửa" @click="openEditModal(p.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </button>
-                <button class="act-btn danger" title="Xóa" @click="removeProduct(i)">
+                <button class="act-btn danger" title="Xóa" @click="removeProduct(p.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                     <polyline points="3 6 5 6 21 6" />
                     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -301,28 +775,33 @@ const submitForm = () => {
       </table>
     </div>
 
-    <!-- PAGINATION -->
     <div class="pagination">
-      <button>‹</button>
-      <button class="pg-active">1</button><button>2</button><button>3</button>
-      <button>›</button>
+      <button :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">‹</button>
+
+      <button
+        v-for="(p, index) in pageItems"
+        :key="`${p}-${index}`"
+        :class="{ 'pg-active': p === currentPage, 'pg-dots': p === '...' }"
+        :disabled="p === '...'"
+        @click="p !== '...' && goToPage(p)"
+      >
+        {{ p }}
+      </button>
+
+      <button :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">›</button>
     </div>
 
-    <!-- ══════════════════════════════════════════════════════
-         MODAL THÊM SẢN PHẨM
-    ═══════════════════════════════════════════════════════ -->
     <Teleport to="body">
       <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
         <div class="modal modal-wide">
 
           <div class="modal-header">
-            <h3>Thêm sản phẩm mới</h3>
+            <h3>{{ isEditMode ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới' }}</h3>
             <button class="modal-close" @click="closeModal">×</button>
           </div>
 
           <div class="modal-body">
 
-            <!-- ẢNH -->
             <div class="form-group">
               <label>Ảnh sản phẩm</label>
               <input ref="fileInputRef" type="file" accept="image/*" style="display:none" @change="onFileChange" />
@@ -344,15 +823,51 @@ const submitForm = () => {
               </div>
             </div>
 
-            <!-- THÔNG TIN CƠ BẢN -->
+            <div class="form-group">
+              <label>Hình ảnh phụ</label>
+              <input
+                ref="extraFileInputRef"
+                type="file"
+                accept="image/*"
+                multiple
+                style="display:none"
+                @change="onExtraFilesChange"
+              />
+              <div class="upload-zone" @click="triggerExtraFileInput">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <p>Kéo thả hoặc <span>bấm để chọn nhiều ảnh</span></p>
+                <small>PNG, JPG, WEBP — có thể chọn nhiều ảnh</small>
+              </div>
+
+              <div v-if="extraImagePreviews.length" class="multi-preview-wrap">
+                <div v-for="(img, index) in extraImagePreviews" :key="index" class="multi-preview-item">
+                  <img :src="img" class="multi-preview-img" :alt="`preview-${index}`" />
+                  <button class="multi-preview-remove" @click="removeExtraImage(index)">×</button>
+                </div>
+              </div>
+            </div>
+
             <div class="form-row">
               <div class="form-group">
                 <label>Tên sản phẩm <span class="required">*</span></label>
                 <input v-model="form.name" placeholder="VD: VinaPro Laptop X2" />
               </div>
               <div class="form-group">
-                <label>SKU <span class="required">*</span></label>
-                <input v-model="form.sku" placeholder="VD: VN-LP-2027" />
+                <label>Thương hiệu <span class="required">*</span></label>
+                <select v-model="form.brand">
+                  <option value="">-- Chọn thương hiệu --</option>
+                  <option
+                    v-for="brand in brands"
+                    :key="brand.id_thuonghieu"
+                    :value="brand.id_thuonghieu"
+                  >
+                    {{ brand.ten_thuonghieu }}
+                  </option>
+                </select>
               </div>
             </div>
             <div class="form-row">
@@ -360,10 +875,13 @@ const submitForm = () => {
                 <label>Danh mục <span class="required">*</span></label>
                 <select v-model="form.category">
                   <option value="">-- Chọn danh mục --</option>
-                  <option>Máy tính xách tay</option>
-                  <option>Điện thoại</option>
-                  <option>Máy tính bảng</option>
-                  <option>Phụ kiện</option>
+                  <option
+                    v-for="category in categories"
+                    :key="category.id_danhmuc"
+                    :value="category.id_danhmuc"
+                  >
+                    {{ category.ten_danhmuc }}
+                  </option>
                 </select>
               </div>
               <div class="form-group">
@@ -376,196 +894,213 @@ const submitForm = () => {
             </div>
             <div class="form-row">
               <div class="form-group">
-                <label>Giá niêm yết <span class="required">*</span></label>
-                <input v-model="form.price" placeholder="VD: 45.990.000" />
+                <label>Khối lượng</label>
+                <input v-model="form.weight" type="number" min="0" step="0.01" placeholder="VD: 2.5" />
               </div>
               <div class="form-group">
-                <label>Số lượng kho <span class="required">*</span></label>
-                <input v-model="form.stock" type="number" min="0" placeholder="VD: 100" />
+                <label>&nbsp;</label>
+                <div></div>
               </div>
             </div>
 
-            <!-- ════════════════════════════════════════
-                 BIẾN THỂ SẢN PHẨM
-            ═══════════════════════════════════════════ -->
             <div class="vs-wrapper">
-
-              <!-- HEADER -->
               <div class="vs-header">
                 <div class="vs-title">
                   <span class="vs-bar"></span>
                   Biến thể sản phẩm
                 </div>
-                <div v-if="variantStep === 2" class="vs-active-group">
-                  <span class="vag-icon">{{ activeGroup?.icon }}</span>
-                  <span class="vag-name">{{ activeGroup?.name }}</span>
-                  <button class="vag-change" @click="backStep1">Đổi nhóm ↩</button>
+                <div class="vs-steps">
+                  <span class="vss" :class="{ active: vsPhase === 1, done: vsPhase === 2 }">
+                    <span class="vss-dot">{{ vsPhase === 2 ? '✓' : '1' }}</span>
+                    Chọn giá trị
+                  </span>
+                  <span class="vss-line"></span>
+                  <span class="vss" :class="{ active: vsPhase === 2 }">
+                    <span class="vss-dot">2</span>
+                    Điền giá &amp; kho
+                  </span>
                 </div>
               </div>
 
-              <!-- ─── STEP 1: CHỌN NHÓM ─── -->
-              <div v-if="variantStep === 1">
-                <p class="step-hint">
-                  Chọn nhóm sản phẩm. Hệ thống sẽ hiển thị <strong>tất cả loại thuộc tính</strong> của nhóm đó
-                  thành các cột — mỗi dòng biến thể bạn tự chọn giá trị tương ứng cho từng cột (CPU, RAM, SSD, GPU...).
-                </p>
-                <div class="group-list">
-                  <button v-for="g in attributeGroups" :key="g.id" class="group-card" @click="goStep2(g.id)">
-                    <span class="gc-icon">{{ g.icon }}</span>
-                    <div class="gc-body">
-                      <span class="gc-name">{{ g.name }}</span>
-                      <div class="gc-chips">
-                        <span v-for="t in g.attrTypes" :key="t.id" class="gc-chip">{{ t.label }}</span>
-                      </div>
-                    </div>
-                    <span class="gc-count">{{ g.attrTypes.length }} thuộc tính / dòng</span>
-                    <span class="gc-arrow">›</span>
+              <template v-if="vsPhase === 1 && !isEditMode">
+                <div v-if="variantLoading" class="group-placeholder">
+                  <span>Đang tải dữ liệu biến thể...</span>
+                </div>
+                <div v-else class="group-tabs">
+                  <button v-for="g in attributeGroups" :key="g.id" class="gtab"
+                    :class="{ 'gtab-active': selectedGroupId === g.id }" @click="selectGroup(g.id)">
+                    <span class="gtab-icon">{{ g.icon }}</span>
+                    <span class="gtab-name">{{ g.name }}</span>
+                    <span v-if="selectedCountInGroup(g) > 0" class="gtab-badge">
+                      {{ selectedCountInGroup(g) }}
+                    </span>
                   </button>
                 </div>
-              </div>
 
-              <!-- ─── STEP 2: BẢNG BIẾN THỂ ─── -->
-              <div v-if="variantStep === 2 && activeGroup">
+                <div v-if="displayAttrTypes.length" class="flat-select-table">
+                  <div v-for="t in displayAttrTypes" :key="t.id" class="fst-row">
+                    <div class="fst-label">
+                      <span class="type-pill" :class="'tp-' + t.color">{{ t.label }}</span>
+                      <span v-if="selectedOptions[t.id]?.size" class="fst-count">
+                        {{ selectedOptions[t.id].size }}
+                      </span>
+                    </div>
 
-                <!-- Chú thích cột -->
-                <div class="col-legend">
-                  <span class="cl-label">Cột hiển thị:</span>
-                  <span v-for="t in activeGroup.attrTypes" :key="t.id" class="cl-chip cl-attr">{{ t.label }}</span>
-                  <span class="cl-sep">＋</span>
-                  <span class="cl-chip cl-color">Màu</span>
-                  <span class="cl-chip cl-price">Giá riêng</span>
-                  <span class="cl-chip cl-stock">Kho</span>
-                  <span class="cl-chip cl-sku">SKU</span>
+                    <div class="fst-options">
+                      <button
+                        v-for="opt in t.options"
+                        :key="getOptionValue(opt)"
+                        class="vbtn"
+                        :class="['vbtn-' + t.color, { 'vbtn-on': isSelected(t.id, getOptionValue(opt)) }]"
+                        @click="toggleOption(t.id, getOptionValue(opt))"
+                      >
+                        <svg
+                          v-if="isSelected(t.id, getOptionValue(opt))"
+                          viewBox="0 0 10 10"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2.2"
+                          stroke-linecap="round"
+                          width="9"
+                          height="9"
+                        >
+                          <polyline points="1,5 3.5,7.5 9,2" />
+                        </svg>
+
+                        <span v-if="getOptionHex(opt)" class="color-option">
+                          <span class="color-dot" :style="{ background: getOptionHex(opt) }"></span>
+                          {{ getOptionLabel(opt) }}
+                        </span>
+                        <span v-else>
+                          {{ getOptionLabel(opt) }}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <!-- Bảng cuộn ngang -->
+                <div v-else class="group-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+                    width="28" height="28">
+                    <rect x="3" y="3" width="18" height="18" rx="3" />
+                    <path d="M9 12h6M12 9v6" />
+                  </svg>
+                  <span>Không có dữ liệu loại thuộc tính</span>
+                </div>
+
+                <div v-if="selectedGroup" class="p1-footer">
+                  <div v-if="activeAttrTypes.length > 0" class="combo-bar">
+                    <span class="combo-formula">
+                      <template v-for="(t, i) in activeAttrTypes" :key="t.id">
+                        <span class="cf-item">
+                          <span class="type-pill-sm" :class="'tp-' + t.color">{{ t.label }}</span>
+                          <b>{{ selectedOptions[t.id]?.size }}</b>
+                        </span>
+                        <span v-if="i < activeAttrTypes.length - 1" class="cf-x">×</span>
+                      </template>
+                      <span class="cf-eq">= <b>{{ comboCount }} biến thể</b></span>
+                    </span>
+                  </div>
+
+                  <div class="p1-actions">
+                    <span v-if="!activeAttrTypes.length" class="p1-hint">
+                      Chọn ít nhất 1 giá trị từ bất kỳ loại nào
+                    </span>
+                    <button class="btn-generate" :disabled="!activeAttrTypes.length" @click="generateVariants">
+                      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" width="13" height="13">
+                        <rect x="1" y="1" width="12" height="12" rx="2" />
+                        <polyline points="3.5,7 5.5,9 10.5,4.5" />
+                      </svg>
+                      Tạo {{ comboCount > 0 ? comboCount + ' ' : '' }}biến thể
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="vsPhase === 2">
+                <div class="p2-toolbar">
+                  <button v-if="!isEditMode" class="btn-back" @click="vsPhase = 1">
+                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                      width="11" height="11">
+                      <polyline points="7.5,1.5 3,6 7.5,10.5" />
+                    </svg>
+                    Chỉnh lại lựa chọn
+                  </button>
+                  <div class="bulk-bar">
+                    <span class="bulk-lbl">Điền nhanh:</span>
+                    <input v-model="bulkPrice" class="bulk-in" placeholder="Giá chung" />
+                    <input v-model="bulkStock" class="bulk-in bulk-num" type="number" min="0" placeholder="Kho" />
+                    <button class="btn-apply" @click="applyBulkAll">Áp dụng tất cả</button>
+                  </div>
+                </div>
+
+                <div class="p2-info">
+                  <template v-if="isEditMode">
+                    Đang hiển thị <b>{{ generatedRows.length }}</b> biến thể hiện có của sản phẩm.
+                  </template>
+                  <template v-else>
+                    Đã tạo <b>{{ generatedRows.length }}</b> tổ hợp từ
+                    <b>{{ activeAttrTypes.length }}</b> loại thuộc tính —
+                    mỗi hàng là duy nhất, không trùng lặp.
+                  </template>
+                </div>
+
                 <div class="vt-scroll">
                   <table class="vt-table">
                     <thead>
                       <tr>
                         <th class="th-no">#</th>
-                        <th v-for="t in activeGroup.attrTypes" :key="t.id" class="th-attr">
-                          <span class="th-attr-pill" :data-type="t.id">{{ t.label }}</span>
+                        <th v-for="t in tableHeaders" :key="t.id">
+                          <span class="type-pill" :class="'tp-' + t.color">{{ t.label }}</span>
                         </th>
-                        <th class="th-color">Màu sắc</th>
                         <th class="th-price">Giá riêng (₫)</th>
                         <th class="th-stock">Kho</th>
-                        <th class="th-sku">SKU biến thể</th>
                         <th class="th-act"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(row, ri) in variantRows" :key="row.id" class="vt-row">
-                        <!-- STT -->
+                      <tr v-for="(row, ri) in generatedRows" :key="row.id" class="vt-row">
                         <td class="td-no"><span class="row-no">{{ ri + 1 }}</span></td>
-
-                        <!-- Cột mỗi loại thuộc tính → dropdown chọn giá trị -->
-                        <td v-for="t in activeGroup.attrTypes" :key="t.id" class="td-attr">
-                          <select v-model="row.attrs[t.id]" class="vt-select">
-                            <option value="">— {{ t.label }} —</option>
-                            <option v-for="opt in t.options" :key="opt" :value="opt">{{ opt }}</option>
-                          </select>
+                        <td v-for="t in tableHeaders" :key="t.id">
+                          <span class="val-chip" :class="'vc-' + t.color">
+                            {{ row.attrs[t.id] || '' }}
+                          </span>
                         </td>
-
-                        <!-- Màu -->
-                        <td class="td-color">
-                          <div class="color-wrap">
-                            <span v-if="row.color" class="cswatch" :style="{ background: colorHex(row.color) }"></span>
-                            <select v-model="row.color" class="vt-select">
-                              <option value="">Không chọn</option>
-                              <option v-for="c in colorList" :key="c.id" :value="c.name">{{ c.name }}</option>
-                            </select>
-                          </div>
-                        </td>
-
-                        <!-- Giá riêng -->
-                        <td class="td-price">
-                          <input v-model="row.price" class="vt-input" placeholder="45.990.000" />
-                        </td>
-
-                        <!-- Kho -->
-                        <td class="td-stock">
-                          <input v-model="row.stock" type="number" min="0" class="vt-input vt-num" />
-                        </td>
-
-                        <!-- SKU biến thể -->
-                        <td class="td-sku">
-                          <input v-model="row.sku" class="vt-input" placeholder="VN-LP-i7-16-512" />
-                        </td>
-
-                        <!-- Actions: clone + xóa -->
+                        <td><input
+                            v-model.number="row.price"
+                            type="number"
+                            class="vt-input"
+                          /></td>
+                        <td><input v-model="row.stock" type="number" min="0" class="vt-input vt-num" /></td>
                         <td class="td-act">
-                          <div class="row-acts">
-                            <button class="ra-btn ra-clone" title="Nhân bản dòng này" @click="cloneRow(ri)">
-                              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"
-                                stroke-linecap="round" width="13" height="13">
-                                <rect x="5" y="5" width="8" height="8" rx="1.5" />
-                                <path d="M3 11V3a1 1 0 0 1 1-1h8" />
-                              </svg>
-                            </button>
-                            <button class="ra-btn ra-del" title="Xóa dòng" @click="removeVariantRow(ri)">
-                              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2"
-                                stroke-linecap="round" width="11" height="11">
-                                <line x1="2" y1="2" x2="12" y2="12" />
-                                <line x1="12" y1="2" x2="2" y2="12" />
-                              </svg>
-                            </button>
-                          </div>
+                          <button class="ra-del" title="Xóa" @click="removeRow(ri)">
+                            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2"
+                              stroke-linecap="round" width="10" height="10">
+                              <line x1="1" y1="1" x2="11" y2="11" />
+                              <line x1="11" y1="1" x2="1" y2="11" />
+                            </svg>
+                          </button>
                         </td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                <!-- Preview các dòng đã điền -->
-                <div v-if="variantRows.some(r => Object.values(r.attrs).some(v => v))" class="vt-preview">
-                  <div class="vtp-label">Xem trước cấu hình</div>
-                  <div v-for="(row, ri) in variantRows" :key="row.id" class="vtp-row">
-                    <span class="vtp-no">{{ ri + 1 }}</span>
-                    <template v-for="t in activeGroup.attrTypes" :key="t.id">
-                      <span v-if="row.attrs[t.id]" class="vtp-chip" :class="'c-' + t.id">
-                        <span class="vtp-type">{{ t.label }}</span>
-                        {{ row.attrs[t.id] }}
-                      </span>
-                    </template>
-                    <span v-if="row.color" class="vtp-color-wrap">
-                      <span class="vtp-dot" :style="{ background: colorHex(row.color) }"></span>
-                      {{ row.color }}
-                    </span>
-                    <span v-if="row.price" class="vtp-price">{{ row.price }} ₫</span>
-                    <span v-if="row.stock" class="vtp-stock">Kho: {{ row.stock }}</span>
-                    <span v-if="row.sku" class="vtp-sku">{{ row.sku }}</span>
-                  </div>
+                <div class="p2-foot">
+                  <span class="p2-count"><b>{{ generatedRows.length }}</b> biến thể</span>
                 </div>
-
-                <!-- Footer -->
-                <div class="vt-footer">
-                  <button class="btn-add-row" @click="addVariantRow">
-                    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                      width="11" height="11">
-                      <line x1="7" y1="1" x2="7" y2="13" />
-                      <line x1="1" y1="7" x2="13" y2="7" />
-                    </svg>
-                    Thêm dòng biến thể
-                  </button>
-                  <span class="vt-stat">
-                    <b>{{ variantRows.length }}</b> biến thể ·
-                    <b>{{ activeGroup.attrTypes.length }}</b> thuộc tính / dòng
-                  </span>
-                </div>
-
-              </div>
-              <!-- /step2 -->
-
+              </template>
             </div>
-            <!-- /vs-wrapper -->
 
             <p v-if="formError" class="form-error">⚠ {{ formError }}</p>
           </div>
 
           <div class="modal-footer">
             <button class="btn-cancel" @click="closeModal">Hủy</button>
-            <button class="btn-submit" @click="submitForm">Thêm sản phẩm</button>
+            <button class="btn-submit" @click="submitForm">
+              {{ isEditMode ? 'Lưu thay đổi' : 'Thêm sản phẩm' }}
+            </button>
           </div>
         </div>
       </div>
@@ -575,7 +1110,6 @@ const submitForm = () => {
 </template>
 
 <style scoped>
-/* ══ BASE ══ */
 .admin {
   padding: 32px 48px;
   background: #f5f7fb;
@@ -583,7 +1117,6 @@ const submitForm = () => {
   font-family: 'Segoe UI', sans-serif;
 }
 
-/* HEADER */
 .top {
   display: flex;
   justify-content: space-between;
@@ -621,7 +1154,6 @@ const submitForm = () => {
   transform: translateY(-1px);
 }
 
-/* STATS */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -678,7 +1210,6 @@ const submitForm = () => {
   background: #ede9fe
 }
 
-/* FILTER */
 .filter-bar {
   display: flex;
   gap: 10px;
@@ -730,7 +1261,6 @@ const submitForm = () => {
   min-width: 160px;
 }
 
-/* TABLE */
 .table-wrap {
   background: white;
   border-radius: 14px;
@@ -833,20 +1363,6 @@ tbody td {
   margin-bottom: 5px;
 }
 
-.bar {
-  height: 4px;
-  background: #e2e8f0;
-  border-radius: 2px;
-  width: 80px;
-}
-
-.fill {
-  height: 100%;
-  background: #2563eb;
-  border-radius: 2px;
-  transition: width .4s;
-}
-
 .status-badge {
   display: inline-block;
   font-size: 11px;
@@ -901,7 +1417,6 @@ tbody td {
   color: #ef4444;
 }
 
-/* PAGINATION */
 .pagination {
   display: flex;
   gap: 6px;
@@ -932,7 +1447,6 @@ tbody td {
   color: white !important;
 }
 
-/* ══ MODAL BASE ══ */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -956,7 +1470,7 @@ tbody td {
 }
 
 .modal-wide {
-  max-width: 1100px;
+  max-width: 960px;
 }
 
 @keyframes modalIn {
@@ -999,7 +1513,6 @@ tbody td {
   cursor: pointer;
   line-height: 1;
   padding: 0;
-  transition: color .2s;
 }
 
 .modal-close:hover {
@@ -1026,7 +1539,6 @@ tbody td {
   border-radius: 0 0 18px 18px;
 }
 
-/* UPLOAD */
 .upload-zone {
   border: 2px dashed #cbd5e1;
   border-radius: 10px;
@@ -1100,7 +1612,6 @@ tbody td {
   font-weight: 600;
   color: #475569;
   cursor: pointer;
-  transition: all .2s;
 }
 
 .img-change:hover {
@@ -1119,11 +1630,6 @@ tbody td {
   cursor: pointer;
 }
 
-.img-remove-btn:hover {
-  background: #fee2e2;
-}
-
-/* FORM */
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1184,7 +1690,6 @@ tbody td {
   font-weight: 600;
   color: #475569;
   cursor: pointer;
-  transition: all .2s;
 }
 
 .btn-cancel:hover {
@@ -1200,7 +1705,6 @@ tbody td {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity .2s, transform .2s;
 }
 
 .btn-submit:hover {
@@ -1208,20 +1712,16 @@ tbody td {
   transform: translateY(-1px);
 }
 
-/* ══════════════════════════════════════════
-   VARIANT SECTION
-══════════════════════════════════════════ */
 .vs-wrapper {
   border: 1.5px solid #e2e8f0;
   border-radius: 14px;
-  padding: 20px;
+  padding: 18px 20px;
   background: #fafbff;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-/* header */
 .vs-header {
   display: flex;
   align-items: center;
@@ -1248,189 +1748,559 @@ tbody td {
   flex-shrink: 0;
 }
 
-/* active group badge */
-.vs-active-group {
+.vs-steps {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 10px 5px 12px;
-  border-radius: 20px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
 }
 
-.vag-icon {
-  font-size: 16px;
-}
-
-.vag-name {
+.vss {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
-  font-weight: 700;
-  color: #1d4ed8;
+  font-weight: 600;
+  color: #94a3b8;
 }
 
-.vag-change {
-  background: none;
-  border: none;
-  font-size: 11px;
+.vss.active {
   color: #2563eb;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
 }
 
-.vag-change:hover {
-  color: #1d4ed8;
+.vss.done {
+  color: #16a34a;
 }
 
-.step-hint {
-  font-size: 12px;
-  color: #64748b;
-  margin: 0;
-  line-height: 1.65;
-}
-
-.step-hint strong {
-  color: #0f172a;
-}
-
-/* GROUP LIST */
-.group-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.group-card {
-  display: flex;
+.vss-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #e2e8f0;
+  display: inline-flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border-radius: 12px;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: white;
+}
+
+.vss.active .vss-dot {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
+}
+
+.vss.done .vss-dot {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: white;
+}
+
+.vss-line {
+  width: 24px;
+  height: 2px;
+  background: #e2e8f0;
+  border-radius: 1px;
+}
+
+.group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 8px;
   border: 1.5px solid #e2e8f0;
   background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
   cursor: pointer;
-  text-align: left;
-  width: 100%;
-  transition: all .2s;
+  transition: all .15s;
+  font-family: inherit;
 }
 
-.group-card:hover {
-  border-color: #2563eb;
-  background: #f0f6ff;
-  box-shadow: 0 2px 14px rgba(37, 99, 235, .1);
-  transform: translateY(-1px);
+.gtab:hover {
+  border-color: #93c5fd;
+  color: #2563eb;
 }
 
-.gc-icon {
-  font-size: 26px;
-  flex-shrink: 0;
+.gtab-active {
+  border-color: #2563eb !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
 }
 
-.gc-body {
-  flex: 1;
+.gtab-icon {
+  font-size: 15px;
+}
+
+.gtab-name {
+  white-space: nowrap;
+}
+
+.gtab-badge {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 5px;
+  background: #2563eb;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flat-select-table {
+  background: white;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.fst-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.fst-row:last-child {
+  border-bottom: none;
+}
+
+.fst-label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.gc-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.gc-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.gc-chip {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.gc-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
-  white-space: nowrap;
-  padding: 3px 10px;
-  background: #f8fafc;
-  border-radius: 6px;
-}
-
-.gc-arrow {
-  color: #94a3b8;
-  font-size: 20px;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 72px;
   flex-shrink: 0;
+  padding-top: 2px;
 }
 
-/* COL LEGEND */
-.col-legend {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding: 10px 14px;
-  background: #f8fafc;
+.fst-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #dbeafe;
+  padding: 1px 6px;
   border-radius: 8px;
-  border: 1px solid #f1f5f9;
 }
 
-.cl-label {
+.fst-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
   font-size: 11px;
-  font-weight: 600;
-  color: #64748b;
-  margin-right: 2px;
-  white-space: nowrap;
+  font-weight: 700;
 }
 
-.cl-chip {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 9px;
-  border-radius: 5px;
-}
-
-.cl-attr {
+.tp-blue {
   background: #dbeafe;
   color: #1d4ed8;
 }
 
-.cl-color {
-  background: #fce7f3;
-  color: #be185d;
-}
-
-.cl-price {
+.tp-green {
   background: #dcfce7;
   color: #166534;
 }
 
-.cl-stock {
+.tp-amber {
   background: #fef3c7;
   color: #92400e;
 }
 
-.cl-sku {
+.tp-pink {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.tp-purple {
   background: #f3e8ff;
   color: #6b21a8;
 }
 
-.cl-sep {
-  font-size: 13px;
-  color: #94a3b8;
-  font-weight: 700;
-  margin: 0 2px;
+.tp-teal {
+  background: #ccfbf1;
+  color: #0f766e;
 }
 
-/* VARIANT TABLE */
+.tp-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.type-pill-sm {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.type-pill-sm.tp-blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.type-pill-sm.tp-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.type-pill-sm.tp-amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.type-pill-sm.tp-pink {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.type-pill-sm.tp-purple {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.type-pill-sm.tp-teal {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.vbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.vbtn-blue:hover {
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.vbtn-green:hover {
+  border-color: #86efac;
+  color: #166534;
+}
+
+.vbtn-amber:hover {
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.vbtn-pink:hover {
+  border-color: #f9a8d4;
+  color: #be185d;
+}
+
+.vbtn-purple:hover {
+  border-color: #d8b4fe;
+  color: #6b21a8;
+}
+
+.vbtn-teal:hover {
+  border-color: #5eead4;
+  color: #0f766e;
+}
+
+.vbtn-red:hover {
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.vbtn-blue.vbtn-on {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-green.vbtn-on {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-amber.vbtn-on {
+  border-color: #d97706;
+  background: #d97706;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-pink.vbtn-on {
+  border-color: #db2777;
+  background: #db2777;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-purple.vbtn-on {
+  border-color: #7c3aed;
+  background: #7c3aed;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-teal.vbtn-on {
+  border-color: #0d9488;
+  background: #0d9488;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-red.vbtn-on {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: white;
+  font-weight: 600;
+}
+
+.color-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  flex-shrink: 0;
+}
+
+.group-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  color: #94a3b8;
+  font-size: 12px;
+  background: white;
+  border: 1.5px dashed #e2e8f0;
+  border-radius: 10px;
+}
+
+.p1-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 16px;
+  background: white;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+}
+
+.combo-formula {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cf-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cf-item b {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.cf-x {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.cf-eq {
+  font-size: 12px;
+  color: #64748b;
+  padding-left: 4px;
+}
+
+.cf-eq b {
+  font-size: 13px;
+  color: #2563eb;
+}
+
+.p1-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.p1-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.btn-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, .28);
+  transition: opacity .2s, transform .2s;
+  font-family: inherit;
+}
+
+.btn-generate:hover {
+  opacity: .9;
+  transform: translateY(-1px);
+}
+
+.btn-generate:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.p2-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+
+.btn-back:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 7px 11px;
+  background: #f8fafc;
+  border-radius: 9px;
+  border: 1px solid #f1f5f9;
+}
+
+.bulk-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.bulk-in {
+  padding: 6px 9px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #0f172a;
+  outline: none;
+  background: white;
+  transition: border-color .2s;
+  width: 108px;
+  font-family: inherit;
+}
+
+.bulk-in:focus {
+  border-color: #2563eb;
+}
+
+.bulk-num {
+  width: 68px;
+  text-align: right;
+}
+
+.btn-apply {
+  padding: 6px 13px;
+  border-radius: 7px;
+  border: none;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-apply:hover {
+  opacity: .88;
+}
+
+.p2-info {
+  font-size: 12px;
+  color: #92400e;
+  padding: 8px 13px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+}
+
+.p2-info b {
+  color: #92400e;
+}
+
 .vt-scroll {
   overflow-x: auto;
   border: 1px solid #e8edf5;
@@ -1441,7 +2311,7 @@ tbody td {
 .vt-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 600px;
+  min-width: 480px;
 }
 
 .vt-table thead tr {
@@ -1449,120 +2319,37 @@ tbody td {
 }
 
 .vt-table thead th {
-  padding: 10px 12px;
+  padding: 9px 12px;
   font-size: 10px;
   font-weight: 700;
   color: #94a3b8;
   text-align: left;
-  letter-spacing: .07em;
+  letter-spacing: .06em;
   border-bottom: 1px solid #f1f5f9;
   white-space: nowrap;
 }
 
 .th-no {
-  width: 40px;
+  width: 38px;
   text-align: center;
-}
-
-.th-attr {
-  min-width: 155px;
-}
-
-.th-color {
-  min-width: 145px;
 }
 
 .th-price {
-  min-width: 145px;
+  min-width: 138px;
 }
 
 .th-stock {
-  width: 80px;
-}
-
-.th-sku {
-  min-width: 160px;
+  width: 76px;
 }
 
 .th-act {
-  width: 72px;
+  width: 44px;
   text-align: center;
-}
-
-.th-attr-pill {
-  display: inline-flex;
-  padding: 2px 9px;
-  border-radius: 4px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-/* Different pastel per attr type */
-.th-attr-pill[data-type="cpu"] {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.th-attr-pill[data-type="ram"] {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.th-attr-pill[data-type="ssd"] {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.th-attr-pill[data-type="gpu"] {
-  background: #fce7f3;
-  color: #be185d;
-}
-
-.th-attr-pill[data-type="os"] {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
-
-.th-attr-pill[data-type="chip"] {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.th-attr-pill[data-type="storage"] {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.th-attr-pill[data-type="network"] {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.th-attr-pill[data-type="connect"] {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.th-attr-pill[data-type="screen"] {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
-
-.th-attr-pill[data-type="type"] {
-  background: #f1f5f9;
-  color: #334155;
-}
-
-.th-attr-pill[data-type="conn"] {
-  background: #dbeafe;
-  color: #1d4ed8;
 }
 
 .vt-row {
   border-bottom: 1px solid #f8fafc;
-  transition: background .15s;
+  transition: background .12s;
 }
 
 .vt-row:last-child {
@@ -1582,6 +2369,10 @@ tbody td {
   text-align: center;
 }
 
+.td-act {
+  text-align: center;
+}
+
 .row-no {
   display: inline-flex;
   align-items: center;
@@ -1595,26 +2386,61 @@ tbody td {
   font-weight: 700;
 }
 
-.vt-select {
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 7px;
-  border: 1px solid #e2e8f0;
+.val-chip {
+  display: inline-block;
   font-size: 12px;
-  color: #0f172a;
-  outline: none;
-  background: #fafbff;
-  cursor: pointer;
-  transition: border-color .2s;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 5px;
+  white-space: nowrap;
+  border: 1px solid;
 }
 
-.vt-select:focus {
-  border-color: #2563eb;
+.vc-blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.vc-green {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.vc-amber {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.vc-pink {
+  background: #fdf2f8;
+  border-color: #f9a8d4;
+  color: #be185d;
+}
+
+.vc-purple {
+  background: #faf5ff;
+  border-color: #e9d5ff;
+  color: #6b21a8;
+}
+
+.vc-teal {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+  color: #0f766e;
+}
+
+.vc-red {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
 
 .vt-input {
   width: 100%;
-  padding: 7px 10px;
+  padding: 7px 9px;
   border-radius: 7px;
   border: 1px solid #e2e8f0;
   font-size: 12px;
@@ -1623,6 +2449,7 @@ tbody td {
   background: #fafbff;
   transition: border-color .2s;
   box-sizing: border-box;
+  font-family: inherit;
 }
 
 .vt-input:focus {
@@ -1630,47 +2457,22 @@ tbody td {
 }
 
 .vt-num {
+  width: 50px;
   text-align: right;
 }
 
-.color-wrap {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.cswatch {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 2px solid rgba(0, 0, 0, .1);
-}
-
-.row-acts {
-  display: flex;
-  gap: 5px;
-  justify-content: center;
-}
-
-.ra-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+.ra-del {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   border: 1px solid #e2e8f0;
   background: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all .2s;
   color: #94a3b8;
-}
-
-.ra-clone:hover {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #2563eb;
+  transition: all .2s;
 }
 
 .ra-del:hover {
@@ -1679,219 +2481,70 @@ tbody td {
   color: #ef4444;
 }
 
-/* PREVIEW */
-.vt-preview {
+.p2-foot {
   display: flex;
-  flex-direction: column;
-  gap: 0;
-  background: white;
-  border: 1px solid #e8edf5;
-  border-radius: 10px;
-  overflow: hidden;
+  justify-content: flex-end;
 }
 
-.vtp-label {
-  font-size: 10px;
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  padding: 9px 14px;
-  background: #f8fafc;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.vtp-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding: 8px 14px;
-  border-bottom: 1px solid #f8fafc;
-}
-
-.vtp-row:last-child {
-  border-bottom: none;
-}
-
-.vtp-no {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #f1f5f9;
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.vtp-chip {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 3px 9px;
-  border-radius: 5px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.vtp-type {
-  font-size: 9px;
-  font-weight: 700;
-  opacity: .7;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-
-.vtp-chip.c-cpu {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.vtp-chip.c-ram {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.vtp-chip.c-ssd {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.vtp-chip.c-gpu {
-  background: #fce7f3;
-  color: #be185d;
-}
-
-.vtp-chip.c-os {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
-
-.vtp-chip.c-chip {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.vtp-chip.c-storage {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.vtp-chip.c-network {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.vtp-chip.c-connect {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.vtp-chip.c-screen {
-  background: #f3e8ff;
-  color: #6b21a8;
-}
-
-.vtp-chip.c-type {
-  background: #f1f5f9;
-  color: #334155;
-}
-
-.vtp-chip.c-conn {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.vtp-color-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: #334155;
-  padding: 3px 9px;
-  border-radius: 5px;
-  background: #fce7f3;
-}
-
-.vtp-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(0, 0, 0, .1);
-  flex-shrink: 0;
-}
-
-.vtp-price {
-  font-size: 11px;
-  font-weight: 700;
-  color: #16a34a;
-  padding: 3px 8px;
-  background: #dcfce7;
-  border-radius: 5px;
-}
-
-.vtp-stock {
-  font-size: 11px;
-  color: #92400e;
-  padding: 3px 8px;
-  background: #fef3c7;
-  border-radius: 5px;
-}
-
-.vtp-sku {
-  font-size: 11px;
-  color: #6b21a8;
-  padding: 3px 8px;
-  background: #f3e8ff;
-  border-radius: 5px;
-  font-family: monospace;
-}
-
-/* FOOTER */
-.vt-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-top: 4px;
-}
-
-.btn-add-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: 1.5px dashed #22c55e;
-  background: white;
-  font-size: 12px;
-  font-weight: 600;
-  color: #16a34a;
-  cursor: pointer;
-  transition: all .2s;
-}
-
-.btn-add-row:hover {
-  background: #f0fdf4;
-  border-color: #16a34a;
-}
-
-.vt-stat {
+.p2-count {
   font-size: 12px;
   color: #64748b;
 }
 
-.vt-stat b {
+.p2-count b {
   color: #0f172a;
 }
 
-/* ══ RESPONSIVE ══ */
-@media (max-width:768px) {
+.multi-preview-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.multi-preview-item {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.multi-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.multi-preview-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.75);
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.pg-dots {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
+}
+
+@media (max-width: 768px) {
   .admin {
     padding: 20px 16px;
   }
@@ -1920,9 +2573,18 @@ tbody td {
     max-width: 98vw;
   }
 
-  .gc-chips,
-  .gc-count {
+  .vs-steps {
     display: none;
+  }
+
+  .p2-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fst-row {
+    flex-direction: column;
+    gap: 8px;
   }
 }
 </style>

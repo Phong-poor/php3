@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\danhmucModel;
+use App\Models\DanhMuc;
 use Illuminate\Http\Request;
 
 class DanhMucController extends Controller
 {
     public function index(){
-        $danhmuc = danhmucModel::all();
+        $danhmuc = DanhMuc::all();
         return response()->json(['thongbao' => 'thành công', 'data' => $danhmuc]);
     }
     public function store(Request $request){
@@ -17,7 +17,7 @@ class DanhMucController extends Controller
             'trangthai'  => 'required|in:active,hidden'
         ]);
 
-        $danhmuc = danhmucModel::create($validated);
+        $danhmuc = DanhMuc::create($validated);
         return response()->json([
             'thongbao' => 'thành công',
             'message' => 'Thêm danh mục thành công',
@@ -26,7 +26,7 @@ class DanhMucController extends Controller
     }
     public function show($id)
     {
-        $danhMuc = danhmucModel::find($id);
+        $danhMuc = DanhMuc::find($id);
 
         if (!$danhMuc) {
             return response()->json(['message' => 'Không tìm thấy danh mục'], 404);
@@ -36,7 +36,7 @@ class DanhMucController extends Controller
     }
     public function update(Request $request, $id)
     {
-        $danhMuc = danhmucModel::find($id);
+        $danhMuc = DanhMuc::find($id);
 
         if (!$danhMuc) {
             return response()->json(['message' => 'Không tìm thấy danh mục để sửa'], 404);
@@ -58,7 +58,7 @@ class DanhMucController extends Controller
         }
         public function destroy($id)
     {
-        $danhMuc = danhmucModel::find($id);
+        $danhMuc = DanhMuc::find($id);
 
         if (!$danhMuc) {
             return response()->json(['message' => 'Không tìm thấy danh mục để xóa'], 404);
