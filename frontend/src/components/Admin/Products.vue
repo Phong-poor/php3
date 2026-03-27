@@ -2352,21 +2352,45 @@ tbody td {
   transition: background .12s;
 }
 
-.vt-row:last-child {
-  border-bottom: none;
+.vbtn-red.vbtn-on {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: white;
+  font-weight: 600;
 }
 
-.vt-row:hover {
-  background: #fafbff;
+/* Placeholder */
+.group-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  color: #94a3b8;
+  font-size: 12px;
+  background: white;
+  border: 1.5px dashed #e2e8f0;
+  border-radius: 10px;
 }
 
-.vt-table tbody td {
-  padding: 9px 12px;
-  vertical-align: middle;
+/* ── PHASE 1 FOOTER ── */
+.p1-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 16px;
+  background: white;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
 }
 
-.td-no {
-  text-align: center;
+.combo-bar {}
+
+.combo-formula {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .td-act {
@@ -2376,14 +2400,7 @@ tbody td {
 .row-no {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #f1f5f9;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 700;
+  gap: 5px;
 }
 
 .val-chip {
@@ -2452,8 +2469,9 @@ tbody td {
   font-family: inherit;
 }
 
-.vt-input:focus {
-  border-color: #2563eb;
+.cf-eq b {
+  font-size: 13px;
+  color: #2563eb;
 }
 
 .vt-num {
@@ -2467,6 +2485,9 @@ tbody td {
   border-radius: 6px;
   border: 1px solid #e2e8f0;
   background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -2475,10 +2496,15 @@ tbody td {
   transition: all .2s;
 }
 
-.ra-del:hover {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #ef4444;
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 7px 11px;
+  background: #f8fafc;
+  border-radius: 9px;
+  border: 1px solid #f1f5f9;
 }
 
 .p2-foot {
