@@ -16,6 +16,8 @@ use App\Http\Controllers\BienTheController;
 use App\Http\Controllers\BienTheHinhAnhController;
 
 
+
+
 Route::get('/danhmuc',             [DanhMucController::class, 'index']);
 Route::post('/danhmuc',         [DanhMucController::class, 'store']);
 Route::get('/danhmuc/{id_danhmuc}',        [DanhMucController::class, 'show']);

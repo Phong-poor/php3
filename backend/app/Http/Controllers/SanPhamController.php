@@ -31,8 +31,8 @@ class SanPhamController extends Controller
         $sanpham = SanPham::with([
             'danhMuc',
             'thuongHieu',
-            'bienThes',
-            'hinhAnhs'
+            'hinhAnhs',
+            'bienThes'
         ])->find($id);
 
         if (!$sanpham) {
@@ -41,7 +41,38 @@ class SanPhamController extends Controller
             ], 404);
         }
 
-        return response()->json($sanpham);
+        $result = [
+            'id_sanpham' => $sanpham->id_sanpham,
+            'tenSP' => $sanpham->tenSP,
+            'SKU' => $sanpham->SKU,
+            'hinhanh' => $sanpham->hinhanh,
+            'trangthai' => $sanpham->trangthai,
+            'khoiluong' => $sanpham->khoiluong,
+
+            'thuong_hieu' => $sanpham->thuongHieu ? [
+                'id_thuonghieu' => $sanpham->thuongHieu->id_thuonghieu,
+                'ten_thuonghieu' => $sanpham->thuongHieu->ten_thuonghieu,
+            ] : null,
+
+            'hinh_anhs' => $sanpham->hinhAnhs->map(function ($img) {
+                return [
+                    'duongdan' => $img->duongdan,
+                    'thutu' => $img->thutu
+                ];
+            })->values(),
+
+            'bien_thes' => $sanpham->bienThes->map(function ($bt) {
+                return [
+                    'id_bienthe' => $bt->id_bienthe,
+                    'ten_bienthe' => $bt->ten_bienthe,
+                    'gia' => $bt->gia,
+                    'soluong' => $bt->soluong,
+                    'thuoc_tinh' => json_decode($bt->thuoc_tinh_json ?? '[]', true),
+                ];
+            })->values()
+        ];
+
+        return response()->json($result);
     }
 
     public function store(Request $request)
@@ -109,6 +140,7 @@ class SanPhamController extends Controller
                         'ten_bienthe' => $bt['ten_bienthe'] ?? null,
                         'gia'         => $bt['gia'],
                         'soluong'     => $bt['soluong'],
+                         'thuoc_tinh_json' => json_encode($bt['thuoc_tinh'] ?? [], JSON_UNESCAPED_UNICODE),
                     ]);
                 }
             }
@@ -236,6 +268,7 @@ class SanPhamController extends Controller
                         'ten_bienthe' => $bt['ten_bienthe'] ?? null,
                         'gia'         => $bt['gia'],
                         'soluong'     => $bt['soluong'],
+                        'thuoc_tinh_json' => json_encode($bt['thuoc_tinh'] ?? [], JSON_UNESCAPED_UNICODE),
                     ]);
                 }
             }

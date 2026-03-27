@@ -56,6 +56,7 @@ onMounted(async () => {
     try {
         const response = await api.get('/sanpham')
         featuredProducts.value = response.data.map(p => ({
+            id: p.id_sanpham,//hihi
             name: p.tenSP,
             category: p.danh_muc?.ten_danhmuc || 'Sản phẩm',
             price: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p.bien_thes?.[0]?.gia || 0),
@@ -266,7 +267,7 @@ onUnmounted(stop)
                             </div>
                             <div class="product-actions">
                                 <button class="btn btn-primary small">Mua ngay</button>
-                                <router-link :to="`/products/:id`" class="btn btn-secondary small">
+                                <router-link :to="`/products/${p.id}`" class="btn btn-secondary small">
                                     Chi tiết
                                 </router-link>
                             </div>

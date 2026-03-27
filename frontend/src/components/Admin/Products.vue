@@ -432,12 +432,7 @@ const activeAttrTypes = computed(() => {
 })
 const tableHeaders = computed(() => {
   if (!isEditMode.value) return activeAttrTypes.value
-
-  return editVariantHeaders.value.map((label, index) => ({
-    id: `attr_${index}`,
-    label,
-    color: colorPool[index % colorPool.length],
-  }))
+  return editVariantHeaders.value
 })
 const totalSelected = computed(() =>
   Object.values(selectedOptions.value).reduce((s, set) => s + (set?.size ?? 0), 0)
@@ -532,8 +527,8 @@ const openEditModal = async (id) => {
 const mapProductToForm = (product) => {
   form.value = {
     name: product?.tenSP || '',
-    category: product?.id_danhmuc ? String(product.id_danhmuc) : '',
-    brand: product?.id_thuonghieu ? String(product.id_thuonghieu) : '',
+    category: String(product?.id_danhmuc ?? product?.danh_muc?.id_danhmuc ?? ''),
+    brand: String(product?.id_thuonghieu ?? product?.thuong_hieu?.id_thuonghieu ?? ''),
     status: String(product?.trangthai) === '1' ? 'Đang bán' : 'Nháp',
     img: '',
     images: [],
@@ -551,12 +546,20 @@ const mapProductToForm = (product) => {
   const bienThes = Array.isArray(product?.bien_thes) ? product.bien_thes : []
 
   generatedRows.value = bienThes.map((row, i) => {
-    const parts = String(row.ten_bienthe || '').split(' - ').filter(Boolean)
-
     const attrs = {}
-    parts.forEach((part, index) => {
-      attrs[`attr_${index}`] = part
-    })
+
+    if (Array.isArray(row.thuoc_tinh) && row.thuoc_tinh.length) {
+      row.thuoc_tinh.forEach((item) => {
+        if (item?.ten_thuoctinh) {
+          attrs[item.ten_thuoctinh] = item.giatri
+        }
+      })
+    } else {
+      const parts = String(row.ten_bienthe || '').split(' - ').filter(Boolean)
+      parts.forEach((part, index) => {
+        attrs[`attr_${index}`] = part
+      })
+    }
 
     return {
       id: row.id_bienthe ?? Date.now() + i,
@@ -568,12 +571,26 @@ const mapProductToForm = (product) => {
     }
   })
 
-  const maxParts = bienThes.reduce((max, row) => {
-    const count = String(row.ten_bienthe || '').split(' - ').filter(Boolean).length
-    return Math.max(max, count)
-  }, 0)
+  const firstVariant = bienThes[0]
 
-  editVariantHeaders.value = Array.from({ length: maxParts }, (_, i) => `Thuộc tính ${i + 1}`)
+  if (firstVariant?.thuoc_tinh?.length) {
+    editVariantHeaders.value = firstVariant.thuoc_tinh.map((item, index) => ({
+      id: item.ten_thuoctinh,
+      label: item.ten_thuoctinh,
+      color: colorPool[index % colorPool.length],
+    }))
+  } else {
+    const maxParts = bienThes.reduce((max, row) => {
+      const count = String(row.ten_bienthe || '').split(' - ').filter(Boolean).length
+      return Math.max(max, count)
+    }, 0)
+
+    editVariantHeaders.value = Array.from({ length: maxParts }, (_, i) => ({
+      id: `attr_${i}`,
+      label: `Thuộc tính ${i + 1}`,
+      color: colorPool[i % colorPool.length],
+    }))
+  }
 
   selectedOptions.value = {}
   vsPhase.value = 2
@@ -626,7 +643,21 @@ const submitForm = async () => {
         ten_bienthe: row.ten_bienthe || Object.values(row.attrs || {}).join(' - '),
         gia: Number(row.price) || 0,
         soluong: Number(row.stock) || 0,
-      })),
+        thuoc_tinh: Object.entries(row.attrs || {}).map(([attrId, value]) => {
+          const attrMeta = allAttrTypes.value.find(t => String(t.id) === String(attrId))
+          const optionMeta = attrMeta?.options?.find(opt => {
+            const optValue = typeof opt === 'object' ? opt.value : opt
+            return String(optValue) === String(value)
+          })
+
+          return {
+            id_thuoctinh: attrMeta?.id ?? null,
+            ten_thuoctinh: attrMeta?.label ?? null,
+            giatri: value,
+            hex: optionMeta?.hex || null,
+          }
+        }),
+      }))
     }
 
     if (isEditMode.value && editingProductId.value) {
