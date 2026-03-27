@@ -2,69 +2,93 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 
+// ─── API ─────────────────────────────
+const api = axios.create({
+    baseURL: 'http://127.0.0.1:8000/api'
+})
+
+// ─── STATE ───────────────────────────
 const searchQuery = ref('')
 const activeTab = ref('Tất cả')
+
 const showModal = ref(false)
 const showEditModal = ref(false)
+
 const formError = ref('')
 const editError = ref('')
 
 const users = ref([])
 const loading = ref(false)
 
-// ✅ LOAD DATA từ API
+// ─── MAPPING ─────────────────────────
+const roleMap = {
+    admin: 'ADMIN',
+    support: 'HỖ TRỢ',
+    user: 'KHÁCH HÀNG'
+}
+
+const roleReverseMap = {
+    'ADMIN': 'admin',
+    'HỖ TRỢ': 'support',
+    'KHÁCH HÀNG': 'user'
+}
+
+const mapRoleFromDB = (r) => roleMap[r?.toLowerCase()] || 'KHÁCH HÀNG'
+const mapRoleToDB = (r) => roleReverseMap[r] || 'user'
+
+const mapStatus = (s) => s === 'locked' ? 'Bị khóa' : 'Hoạt động'
+const mapStatusToDB = (s) => s === 'Bị khóa' ? 'locked' : 'active'
+
+// ─── NORMALIZE ───────────────────────
+const normalizeUser = (u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    phone: u.phone || '',
+    role: mapRoleFromDB(u.role),
+    joined: new Date(u.created_at).toLocaleDateString('vi-VN'),
+    status: mapStatus(u.status)
+})
+
+// ─── FETCH ───────────────────────────
 const fetchUsers = async () => {
+    loading.value = true
     try {
-        loading.value = true
-        const res = await axios.get('http://127.0.0.1:8000/api/users')
-        users.value = res.data.map(u => ({
-            id: u.id,
-            name: u.name,
-            email: u.email,
-            phone: u.phone || '',
-            // ✅ Map role từ DB: 'admin' -> 'ADMIN', 'user' -> 'KHÁCH HÀNG'
-            role: mapRoleFromDB(u.role),
-            joined: new Date(u.created_at).toLocaleDateString('vi-VN'),
-            status: u.status === 'locked' ? 'Bị khóa' : 'Hoạt động'
-        }))
+        const { data } = await api.get('/users')
+        users.value = data.map(normalizeUser)
     } catch (err) {
-        console.log('Lỗi load users:', err)
+        console.log('Load lỗi:', err)
     } finally {
         loading.value = false
     }
 }
 
-// ✅ Map role từ backend sang display
-const mapRoleFromDB = (role) => {
-    if (!role) return 'KHÁCH HÀNG'
-    const r = role.toLowerCase()
-    if (r === 'admin') return 'ADMIN'
-    if (r === 'support' || r === 'hỗ trợ') return 'HỖ TRỢ'
-    return 'KHÁCH HÀNG'
-}
-
-// ✅ Map role từ display sang backend
-const mapRoleToDB = (role) => {
-    if (role === 'ADMIN') return 'admin'
-    if (role === 'HỖ TRỢ') return 'support'
-    return 'user'
-}
-
 onMounted(fetchUsers)
 
-const tabs = ['Tất cả', 'Admin', 'Khách hàng', 'Hỗ trợ']
+// ─── FILTER ──────────────────────────
+const filtered = computed(() => {
+    const q = searchQuery.value.toLowerCase()
 
-const roleStyle = {
-    'ADMIN': { bg: '#dbeafe', color: '#1d4ed8' },
-    'KHÁCH HÀNG': { bg: '#dcfce7', color: '#15803d' },
-    'HỖ TRỢ': { bg: '#ede9fe', color: '#6d28d9' },
-}
+    return users.value.filter(u => {
+        const matchSearch =
+            u.name.toLowerCase().includes(q) ||
+            u.email.toLowerCase().includes(q)
 
-const statusStyle = {
-    'Hoạt động': { color: '#16a34a' },
-    'Bị khóa': { color: '#dc2626' },
-}
+        const map = {
+            'Admin': 'ADMIN',
+            'Khách hàng': 'KHÁCH HÀNG',
+            'Hỗ trợ': 'HỖ TRỢ'
+        }
 
+        const matchTab =
+            activeTab.value === 'Tất cả' ||
+            u.role === map[activeTab.value]
+
+        return matchSearch && matchTab
+    })
+})
+
+// ─── AVATAR ──────────────────────────
 const avatarColors = ['#dbeafe', '#dcfce7', '#ede9fe', '#fef9c3', '#fee2e2', '#ffedd5']
 const avatarText = ['#1d4ed8', '#15803d', '#6d28d9', '#a16207', '#b91c1c', '#c2410c']
 
@@ -76,52 +100,50 @@ const getAvatarStyle = (name) => {
 const initials = (name) =>
     name?.trim().split(' ').map(w => w[0]).slice(-2).join('').toUpperCase()
 
-// ✅ FILTER
-const filtered = computed(() =>
-    users.value.filter(u => {
-        const matchSearch =
-            u.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-            u.email.toLowerCase().includes(searchQuery.value.toLowerCase())
-        const matchTab =
-            activeTab.value === 'Tất cả' ||
-            (activeTab.value === 'Admin' && u.role === 'ADMIN') ||
-            (activeTab.value === 'Khách hàng' && u.role === 'KHÁCH HÀNG') ||
-            (activeTab.value === 'Hỗ trợ' && u.role === 'HỖ TRỢ')
-        return matchSearch && matchTab
-    })
-)
+// ─── VALIDATE ────────────────────────
+const validateUser = (f, isEdit = false) => {
+    if (!f.name?.trim()) return 'Nhập họ tên'
+    if (!f.email?.trim()) return 'Nhập email'
 
-// ✅ TOGGLE STATUS - gọi API
-const toggleStatus = async (u) => {
-    const newStatus = u.status === 'Hoạt động' ? 'locked' : 'active'
-    try {
-        await axios.put(`http://127.0.0.1:8000/api/users/${u.id}`, {
-            status: newStatus
-        })
-        u.status = u.status === 'Hoạt động' ? 'Bị khóa' : 'Hoạt động'
-    } catch (err) {
-        console.log('Toggle status lỗi:', err)
-        // Nếu chưa có API status, chỉ toggle local
-        u.status = u.status === 'Hoạt động' ? 'Bị khóa' : 'Hoạt động'
-    }
+    if (!isEdit && !f.password) return 'Nhập mật khẩu'
+    if (f.password && f.password.length < 8) return 'Mật khẩu >= 8 ký tự'
+
+    return null
 }
 
-// ✅ DELETE - dùng u.id thay vì index
-const removeUser = async (userId) => {
-    if (!confirm('Bạn có chắc muốn xóa người dùng này?')) return
+// ─── TOGGLE ──────────────────────────
+const toggleStatus = async (u) => {
+    const next = u.status === 'Hoạt động' ? 'Bị khóa' : 'Hoạt động'
+
     try {
-        await axios.delete(`http://127.0.0.1:8000/api/users/${userId}`)
-        users.value = users.value.filter(u => u.id !== userId)
+        await api.put(`/users/${u.id}`, {
+            status: mapStatusToDB(next)
+        })
+    } catch (err) {
+        console.log('Toggle lỗi:', err)
+    }
+
+    u.status = next
+}
+
+// ─── DELETE ──────────────────────────
+const removeUser = async (id) => {
+    if (!confirm('Xóa user này?')) return
+
+    try {
+        await api.delete(`/users/${id}`)
+        users.value = users.value.filter(u => u.id !== id)
     } catch (err) {
         console.log('Xóa lỗi:', err)
     }
 }
 
-// ─── CREATE MODAL ───────────────────────────────────────────
+// ─── CREATE ──────────────────────────
 const defaultForm = () => ({
     name: '', email: '', phone: '', role: 'KHÁCH HÀNG',
     status: 'Hoạt động', password: ''
 })
+
 const form = ref(defaultForm())
 
 const openModal = () => {
@@ -129,97 +151,64 @@ const openModal = () => {
     formError.value = ''
     showModal.value = true
 }
-const closeModal = () => { showModal.value = false }
 
-// ✅ CREATE USER - gửi role lên backend
+const closeModal = () => showModal.value = false
+
 const submitForm = async () => {
-    if (!form.value.name.trim()) { formError.value = 'Vui lòng nhập họ tên.'; return }
-    if (!form.value.email.trim()) { formError.value = 'Vui lòng nhập email.'; return }
-    if (!form.value.password.trim()) { formError.value = 'Vui lòng nhập mật khẩu.'; return }
-    if (form.value.password.length < 8) { formError.value = 'Mật khẩu tối thiểu 8 ký tự.'; return }
+    const err = validateUser(form.value)
+    if (err) return formError.value = err
 
     try {
-        const res = await axios.post('http://127.0.0.1:8000/api/register', {
-            name: form.value.name,
-            email: form.value.email,
-            password: form.value.password,
-            password_confirmation: form.value.password,
-            role: mapRoleToDB(form.value.role), // ✅ gửi role
-            phone: form.value.phone
+        const { data } = await api.post('/register', {
+            ...form.value,
+            role: mapRoleToDB(form.value.role),
+            password_confirmation: form.value.password
         })
 
-        const newUser = res.data.user
-        users.value.unshift({
-            id: newUser.id,
-            name: newUser.name,
-            email: newUser.email,
-            phone: newUser.phone || '',
-            role: form.value.role,
-            joined: new Date().toLocaleDateString('vi-VN'),
-            status: 'Hoạt động'
-        })
+        users.value.unshift(normalizeUser(data.user))
         closeModal()
     } catch (err) {
-        const msg = err.response?.data?.message || 'Tạo user thất bại'
-        formError.value = msg
+        formError.value = err.response?.data?.message || 'Lỗi tạo user'
     }
 }
 
-// ─── EDIT MODAL ──────────────────────────────────────────────
+// ─── EDIT ────────────────────────────
 const editingUser = ref(null)
 const editForm = ref({})
 
 const openEditModal = (u) => {
     editingUser.value = u
-    editForm.value = {
-        name: u.name,
-        email: u.email,
-        phone: u.phone || '',
-        role: u.role,
-        status: u.status,
-        password: ''
-    }
+    editForm.value = { ...u, password: '' }
     editError.value = ''
     showEditModal.value = true
 }
-const closeEditModal = () => { showEditModal.value = false; editingUser.value = null }
 
-// ✅ UPDATE USER
+const closeEditModal = () => {
+    showEditModal.value = false
+    editingUser.value = null
+}
+
 const submitEdit = async () => {
-    if (!editForm.value.name.trim()) { editError.value = 'Vui lòng nhập họ tên.'; return }
-    if (!editForm.value.email.trim()) { editError.value = 'Vui lòng nhập email.'; return }
-    if (editForm.value.password && editForm.value.password.length < 8) {
-        editError.value = 'Mật khẩu tối thiểu 8 ký tự.'; return
-    }
+    const err = validateUser(editForm.value, true)
+    if (err) return editError.value = err
 
     const payload = {
-        name: editForm.value.name,
-        email: editForm.value.email,
-        phone: editForm.value.phone,
+        ...editForm.value,
         role: mapRoleToDB(editForm.value.role),
-        status: editForm.value.status === 'Hoạt động' ? 'active' : 'locked',
+        status: mapStatusToDB(editForm.value.status)
     }
-    if (editForm.value.password) payload.password = editForm.value.password
+
+    if (!payload.password) delete payload.password
 
     try {
-        await axios.put(`http://127.0.0.1:8000/api/users/${editingUser.value.id}`, payload)
+        const { data } = await api.put(`/users/${editingUser.value.id}`, payload)
 
-        // ✅ Cập nhật local
-        const idx = users.value.findIndex(u => u.id === editingUser.value.id)
-        if (idx !== -1) {
-            users.value[idx] = {
-                ...users.value[idx],
-                name: editForm.value.name,
-                email: editForm.value.email,
-                phone: editForm.value.phone,
-                role: editForm.value.role,
-                status: editForm.value.status,
-            }
-        }
+        const i = users.value.findIndex(u => u.id === editingUser.value.id)
+        if (i !== -1) users.value[i] = normalizeUser(data.user)
+
         closeEditModal()
     } catch (err) {
-        const msg = err.response?.data?.message || 'Cập nhật thất bại'
-        editError.value = msg
+        editError.value = err.response?.data?.message || 'Update lỗi'
     }
 }
 </script>

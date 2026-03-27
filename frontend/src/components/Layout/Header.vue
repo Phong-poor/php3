@@ -150,7 +150,7 @@ const handleLogout = async () => {
                 </div>
               </div>
               <div class="drop-footer" v-if="wishlistItems.length > 0">
-                <router-link to="/wishlist" class="drop-action-btn" @click="showWishlist = false">
+                <router-link to="/products" class="drop-action-btn" @click="showWishlist = false">
                   Xem tất cả
                 </router-link>
               </div>
