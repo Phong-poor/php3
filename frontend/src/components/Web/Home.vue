@@ -6,7 +6,7 @@ import GiftPopup from './GiftPopup.vue'
 import api from '../../services/api'
 
 const showGift = ref(false)
-onMounted(() => { setTimeout(() => { showGift.value = true }, 10000) })
+
 
 const slides = [
     {
@@ -45,56 +45,33 @@ const categories = [
     { name: 'Doanh nhân', desc: 'Thiết kế cao cấp, bảo mật tốt', icon: '👔' }
 ]
 
-const featuredProducts = [
-    {
-        name: 'VinaBook Pro X14', category: 'Ultrabook',
-        price: '36.990.000đ', old: '40.990.000đ',
-        img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800',
-        badge: 'BÁN CHẠY', specs: ['Core Ultra 7', '16GB RAM', '1TB SSD', '2.8K OLED']
-    },
-    {
-        name: 'Zephyrus Titan 16', category: 'Gaming',
-        price: '62.990.000đ', old: '68.990.000đ',
-        img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800',
-        badge: 'HOT SALE', specs: ['Core i9', 'RTX 5080', '32GB RAM', '240Hz']
-    },
-    {
-        name: 'Creator Studio 15', category: 'Designer',
-        price: '48.490.000đ', old: '52.990.000đ',
-        img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=800',
-        badge: 'MỚI', specs: ['Ryzen 9', 'RTX 4070', '32GB RAM', '3K Display']
-    },
-    {
-        name: 'Office Air 14', category: 'Work',
-        price: '24.990.000đ', old: '27.490.000đ',
-        img: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800',
-        badge: 'ƯU ĐÃI', specs: ['Core i5', '16GB RAM', '512GB SSD', '1.2kg']
-    },
-    {
-        name: 'ProMax Elite 15', category: 'Business',
-        price: '42.990.000đ', old: '47.490.000đ',
-        img: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=800',
-        badge: 'MỚI', specs: ['Core i7', '32GB RAM', '1TB SSD', 'FHD IPS']
-    },
-    {
-        name: 'SlimBook Ultra 13', category: 'Ultrabook',
-        price: '29.490.000đ', old: '33.990.000đ',
-        img: 'https://images.unsplash.com/photo-1511385348-a52b4a160dc2?w=800',
-        badge: 'BÁN CHẠY', specs: ['Core i7', '16GB RAM', '512GB SSD', '0.98kg']
-    },
-    {
-        name: 'RazerX Blade 17', category: 'Gaming',
-        price: '55.990.000đ', old: '61.990.000đ',
-        img: 'https://images.unsplash.com/photo-1593640495253-23196b27a87f?w=800',
-        badge: 'HOT', specs: ['Core i9', 'RTX 4080', '32GB RAM', '165Hz']
-    },
-    {
-        name: 'WorkStation Pro 16', category: 'Creator',
-        price: '68.990.000đ', old: '74.990.000đ',
-        img: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=800',
-        badge: 'CAO CẤP', specs: ['Ryzen 9', 'RTX 4090', '64GB RAM', '4K OLED']
+// 
+const featuredProducts = ref([])
+onMounted(async () => {
+    // Hiện popup sau 10 giây
+    setTimeout(() => {
+        showGift.value = true
+    }, 10000)
+
+    try {
+        const response = await api.get('/sanpham')
+        featuredProducts.value = response.data.map(p => ({
+            name: p.tenSP,
+            category: p.danh_muc?.ten_danhmuc || 'Sản phẩm',
+            price: new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p.bien_thes?.[0]?.gia || 0),
+            old: '', // Hoặc có thể lấy từ db nếu có
+            img: p.hinhanh ? 'http://127.0.0.1:8000/storage/' + p.hinhanh : 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800',
+            badge: p.trangthai === 'Hot' ? 'HOT' : '',
+            specs: [
+                `Thương hiệu: ${p.thuong_hieu?.ten_thuonghieu || 'N/A'}`,
+                p.khoiluong ? `Cân nặng: ${p.khoiluong}kg` : ''
+            ].filter(s => s)
+        }))
+    } catch (error) {
+        console.error('Lỗi khi tải sản phẩm:', error)
     }
 })
+
 
 const benefits = [
     { icon: '✔️', title: '100% chính hãng', desc: 'Cam kết sản phẩm mới, nguyên seal, đầy đủ chứng từ.' },
