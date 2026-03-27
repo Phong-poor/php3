@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import Header from '../Layout/Header.vue'
 import Footer from '../Layout/Footer.vue'
+import api from '../../services/api'
 
 
 const selectedBrands = ref(['Apple'])
@@ -15,52 +16,25 @@ const toggleBrand = (b) => {
     else selectedBrands.value.splice(idx, 1)
 }
 
-const products = [
-    {
-        name: 'MacBook Pro M3 Max',
-        brand: 'Apple M3 Max · 32GB · 1TB',
-        price: '74.990.000đ',
-        oldPrice: '82.990.000đ',
-        img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500',
-        badge: 'NEW', badgeColor: '#7c3aed'
-    },
-    {
-        name: 'ASUS Zenbook S13 OLED',
-        brand: 'Ultra 7 · 32GB · 512GB',
-        price: '31.490.000đ',
-        oldPrice: '36.990.000đ',
-        img: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500',
-        badge: 'HOT', badgeColor: '#dc2626'
-    },
-    {
-        name: 'Dell XPS 14 9440',
-        brand: 'Ultra 7 · 32GB · 1TB',
-        price: '52.990.000đ',
-        img: 'https://images.unsplash.com/photo-1511385348-a52b4a160dc2?w=500'
-    },
-    {
-        name: 'Lenovo Yoga Pro 9i',
-        brand: 'Core Ultra 9 · 32GB',
-        price: '48.290.000đ',
-        oldPrice: '51.990.000đ',
-        img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=500',
-        badge: 'NEW', badgeColor: '#2563eb'
-    },
-    {
-        name: 'MSI Raider GE78 HX',
-        brand: 'i9 · RTX 4090',
-        price: '89.990.000đ',
-        oldPrice: '99.990.000đ',
-        img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=500',
-        badge: '-10%', badgeColor: '#16a34a'
-    },
-    {
-        name: 'HP Spectre x360 14',
-        brand: 'Ultra 7 · 16GB',
-        price: '38.490.000đ',
-        img: 'https://images.unsplash.com/photo-1517059224940-d4af9eec41e7?w=500'
+const products = ref([])
+
+onMounted(async () => {
+    try {
+        const response = await api.get('/sanpham')
+        products.value = response.data.map(p => ({
+            id_sanpham: p.id_sanpham,
+            name: p.tenSP,
+            brand: `${p.thuong_hieu?.ten_thuonghieu || ''} ${p.khoiluong ? '· ' + p.khoiluong + 'kg' : ''}`,
+            price: new Intl.NumberFormat('vi-VN').format(p.bien_thes?.[0]?.gia || 0) + 'đ',
+            oldPrice: '', 
+            img: p.hinhanh ? 'http://127.0.0.1:8000/storage/' + p.hinhanh : '',
+            badge: p.trangthai === 'Hot' ? 'HOT' : (p.trangthai === 'Mới' ? 'NEW' : ''),
+            badgeColor: p.trangthai === 'Hot' ? '#dc2626' : '#2563eb'
+        }))
+    } catch (error) {
+        console.error('Lỗi khi tải sản phẩm:', error)
     }
-]
+})
 </script>
 
 <template>
@@ -164,7 +138,7 @@ const products = [
 
                 <!-- GRID -->
                 <div class="grid">
-                    <div class="card" v-for="(p, i) in products" :key="i">
+                    <div class="card" v-for="(p, i) in products" :key="p.id_sanpham || i">
 
                         <span v-if="p.badge" class="badge" :style="{ background: p.badgeColor }">{{ p.badge }}</span>
 

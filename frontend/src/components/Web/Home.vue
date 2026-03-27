@@ -3,16 +3,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import Header from '../Layout/Header.vue'
 import Footer from '../Layout/Footer.vue'
 import GiftPopup from './GiftPopup.vue'
+import api from '../../services/api'
 
 // ── Popup ──────────────────────────────────────────────────
 const showGift = ref(false)
 
-onMounted(() => {
-    // Hiện popup sau 8 giây khi vào trang Home
-    setTimeout(() => {
-        showGift.value = true
-    }, 10000)
-})
 
 // ── Slides ─────────────────────────────────────────────────
 const slides = [
@@ -52,44 +47,32 @@ const categories = [
     { name: 'Doanh nhân', desc: 'Thiết kế cao cấp, bảo mật tốt', icon: '👔' }
 ]
 
-const featuredProducts = [
-    {
-        name: 'VinaBook Pro X14',
-        category: 'Ultrabook',
-        price: '36.990.000đ',
-        old: '40.990.000đ',
-        img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=800',
-        badge: 'BÁN CHẠY',
-        specs: ['Core Ultra 7', '16GB RAM', '1TB SSD', '2.8K OLED']
-    },
-    {
-        name: 'Zephyrus Titan 16',
-        category: 'Gaming',
-        price: '62.990.000đ',
-        old: '68.990.000đ',
-        img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800',
-        badge: 'HOT SALE',
-        specs: ['Core i9', 'RTX 5080', '32GB RAM', '240Hz']
-    },
-    {
-        name: 'Creator Studio 15',
-        category: 'Designer',
-        price: '48.490.000đ',
-        old: '52.990.000đ',
-        img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=800',
-        badge: 'MỚI',
-        specs: ['Ryzen 9', 'RTX 4070', '32GB RAM', '3K Display']
-    },
-    {
-        name: 'Office Air 14',
-        category: 'Work',
-        price: '24.990.000đ',
-        old: '27.490.000đ',
-        img: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800',
-        badge: 'ƯU ĐÃI',
-        specs: ['Core i5', '16GB RAM', '512GB SSD', '1.2kg']
+const featuredProducts = ref([])
+
+onMounted(async () => {
+    // Hiện popup sau 10 giây
+    setTimeout(() => {
+        showGift.value = true
+    }, 10000)
+
+    try {
+        const response = await api.get('/sanpham')
+        featuredProducts.value = response.data.map(p => ({
+            name: p.tenSP,
+            category: p.danh_muc?.ten_danhmuc || 'Ultrabook',
+            price: new Intl.NumberFormat('vi-VN').format(p.bien_thes?.[0]?.gia || 0) + 'đ',
+            old: '', 
+            img: p.hinhanh ? 'http://127.0.0.1:8000/storage/' + p.hinhanh : '',
+            badge: p.trangthai === 'Hot' ? 'HOT SALE' : '',
+            specs: [
+                p.thuong_hieu?.ten_thuonghieu,
+                p.khoiluong ? `${p.khoiluong}kg` : ''
+            ].filter(s => s)
+        }))
+    } catch (error) {
+        console.error('Lỗi khi tải sản phẩm:', error)
     }
-]
+})
 
 const benefits = [
     { icon: '✔️', title: '100% chính hãng', desc: 'Cam kết sản phẩm mới, nguyên seal, đầy đủ chứng từ.' },
