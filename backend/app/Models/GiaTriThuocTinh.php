@@ -2,6 +2,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\BienThe;
 
 class GiaTriThuocTinh extends Model
 {
@@ -15,9 +16,18 @@ class GiaTriThuocTinh extends Model
         'trangthai',
     ];
 
-    // giá trị thuộc về thuộc tính
     public function thuocTinh()
     {
         return $this->belongsTo(ThuocTinh::class, 'id_thuoctinh', 'id_thuoctinh');
+    }
+
+    public function bienThes()
+    {
+        return $this->belongsToMany(
+            BienThe::class,
+            'bienthe_thuoctinh',
+            'id_giatri',
+            'id_bienthe'
+        );
     }
 }
