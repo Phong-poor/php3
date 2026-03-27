@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import Header from '../Layout/Header.vue'
 import Footer from '../Layout/Footer.vue'
 import GiftPopup from './GiftPopup.vue'
+import api from '../../services/api'
 
 const showGift = ref(false)
 onMounted(() => { setTimeout(() => { showGift.value = true }, 10000) })
@@ -93,7 +94,7 @@ const featuredProducts = [
         img: 'https://images.unsplash.com/photo-1525547719571-a2d4ac8945e2?w=800',
         badge: 'CAO CẤP', specs: ['Ryzen 9', 'RTX 4090', '64GB RAM', '4K OLED']
     }
-]
+})
 
 const benefits = [
     { icon: '✔️', title: '100% chính hãng', desc: 'Cam kết sản phẩm mới, nguyên seal, đầy đủ chứng từ.' },

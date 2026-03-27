@@ -1,285 +1,665 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import axios from 'axios'
 
+const api = axios.create({
+  baseURL: 'http://127.0.0.1:8000/api',
+})
+
+/* ═══════════════════════════════════════
+   DANH SÁCH SẢN PHẨM
+═══════════════════════════════════════ */
 const searchQuery = ref('')
 const selectedStatus = ref('')
+const selectedCategory = ref('')
 
-const products = ref([
-  {
-    name: 'VinaPro Laptop X1',
-    sku: 'VN-LP-2026',
-    category: 'Máy tính xách tay',
-    price: '45.990.000',
-    stock: 124,
-    status: 'Đang bán',
-    img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200'
-  },
-  {
-    name: 'VinaPhone Ultra S',
-    sku: 'VN-PH-2026',
-    category: 'Điện thoại',
-    price: '22.500.000',
-    stock: 12,
-    status: 'Nháp',
-    img: 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=200'
-  },
-  {
-    name: 'VinaTab Air G3',
-    sku: 'VN-TB-2026',
-    category: 'Máy tính bảng',
-    price: '15.200.000',
-    stock: 56,
-    status: 'Đang bán',
-    img: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=200'
-  },
-  {
-    name: 'VinaSound Studio H1',
-    sku: 'VN-AC-2026',
-    category: 'Phụ kiện',
-    price: '5.800.000',
-    stock: 210,
-    status: 'Đang bán',
-    img: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=200'
-  },
-])
+const currentPage = ref(1)
+const PER_PAGE = 10
 
+const products = ref([])
+const categories = ref([])
+const brands = ref([])
+const colors = ref([])
+const readingExtraImages = ref(false)
+const variantLoading = ref(false)
 const filteredProducts = computed(() =>
   products.value.filter(p => {
-    const matchSearch =
-      p.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.value.toLowerCase())
-    const matchStatus = !selectedStatus.value || p.status === selectedStatus.value
-    return matchSearch && matchStatus
+    const s = searchQuery.value.toLowerCase()
+
+    return (!s || p.name.toLowerCase().includes(s) || p.sku.toLowerCase().includes(s))
+      && (!selectedStatus.value || p.status === selectedStatus.value)
+      && (!selectedCategory.value || String(p.categoryId) === String(selectedCategory.value))
   })
 )
 
-const stockPercent = (stock) => Math.min((stock / 250) * 100, 100)
-const removeProduct = (index) => products.value.splice(index, 1)
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredProducts.value.length / PER_PAGE))
+)
 
-/* ───────────── MODAL ───────────── */
+const paginatedProducts = computed(() => {
+  const start = (currentPage.value - 1) * PER_PAGE
+  return filteredProducts.value.slice(start, start + PER_PAGE)
+})
+
+const pageItems = computed(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+
+  if (current <= 3) {
+    return [1, 2, 3, '...', total - 2, total - 1, total]
+  }
+
+  if (current >= total - 2) {
+    return [1, 2, 3, '...', total - 2, total - 1, total]
+  }
+
+  return [1, '...', current - 1, current, current + 1, '...', total]
+})
+
+const goToPage = (page) => {
+  if (page < 1) {
+    currentPage.value = 1
+    return
+  }
+  if (page > totalPages.value) {
+    currentPage.value = totalPages.value
+    return
+  }
+  currentPage.value = page
+}
+
+watch([searchQuery, selectedStatus, selectedCategory], () => {
+  currentPage.value = 1
+})
+
+const getErrorMessage = (error, fallback) => {
+  if (error?.response?.data?.message) return error.response.data.message
+
+  const errors = error?.response?.data?.errors
+  if (errors && typeof errors === 'object') {
+    const firstKey = Object.keys(errors)[0]
+    if (firstKey && Array.isArray(errors[firstKey]) && errors[firstKey][0]) {
+      return errors[firstKey][0]
+    }
+  }
+
+  return fallback
+}
+
+const fetchProducts = async () => {
+  try {
+    const res = await api.get('/sanpham')
+
+    products.value = res.data.map(p => {
+      const variantCount = Array.isArray(p.bien_thes) ? p.bien_thes.length : 0
+
+      return {
+        id: p.id_sanpham,
+        name: p.tenSP,
+        sku: p.SKU || '',
+        category: p.danh_muc?.ten_danhmuc || 'Chưa có danh mục',
+        categoryId: p.id_danhmuc ?? '',
+        brand: p.thuong_hieu?.ten_thuonghieu || 'Chưa có thương hiệu',
+        totalVariants: variantCount,
+        status: String(p.trangthai) === '1' ? 'Đang bán' : 'Nháp',
+        img: p.hinhanh
+          ? `http://127.0.0.1:8000/storage/${p.hinhanh}`
+          : 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200',
+      }
+    })
+  } catch (error) {
+    formError.value = getErrorMessage(error, 'Không tải được danh sách sản phẩm.')
+  }
+}
+
+const fetchCategories = async () => {
+  try {
+    const res = await api.get('/danhmuc')
+
+    categories.value = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.data)
+        ? res.data.data
+        : []
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const fetchBrands = async () => {
+  try {
+    const res = await api.get('/thuonghieu')
+
+    brands.value = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.data)
+        ? res.data.data
+        : []
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const fetchColors = async () => {
+  try {
+    const res = await api.get('/colors')
+
+    colors.value = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.data)
+        ? res.data.data
+        : []
+
+    buildAttributeGroups()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const removeProduct = async (id) => {
+  try {
+    await api.delete(`/sanpham/${id}`)
+    await fetchProducts()
+  } catch (error) {
+    formError.value = getErrorMessage(error, 'Không xóa được sản phẩm.')
+  }
+}
+const resetForm = () => {
+  form.value = defaultForm()
+  imgPreview.value = ''
+  extraImagePreviews.value = []
+  formError.value = ''
+
+  vsPhase.value = 1
+  selectedOptions.value = {}
+  generatedRows.value = []
+  editVariantHeaders.value = []
+  bulkPrice.value = ''
+  bulkStock.value = ''
+
+  selectedGroupId.value = attributeGroups.value.length > 0
+    ? attributeGroups.value[0].id
+    : null
+
+  if (fileInputRef.value) fileInputRef.value.value = ''
+  if (extraFileInputRef.value) extraFileInputRef.value.value = ''
+}
+const parseVariantName = (name) => {
+  if (!name) return {}
+  const parts = String(name).split(' - ')
+  const obj = {}
+
+  parts.forEach((part, index) => {
+    obj[`attr_${index}`] = part
+  })
+
+  return obj
+}
+/* ═══════════════════════════════════════
+   NHÓM THUỘC TÍNH & LOẠI THUỘC TÍNH
+═══════════════════════════════════════ */
+const baseAttributeGroups = ref([])
+const attributeGroups = ref([])
+
+const groupIconMap = {
+  'Cấu hình': '💻',
+  'Màn hình': '🖥️',
+  'Pin & Sạc': '🔋',
+  'Kết nối': '📡',
+  'Phụ kiện': '🖱️',
+  'Màu sắc': '🎨',
+}
+
+const colorPool = ['blue', 'green', 'amber', 'pink', 'purple', 'teal']
+
+const getGroupIcon = (name) => {
+  return groupIconMap[name] || '📦'
+}
+
+const getTypeColor = (name) => {
+  if (!name) return 'blue'
+  const index =
+    String(name)
+      .split('')
+      .reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % colorPool.length
+
+  return colorPool[index]
+}
+
+const buildAttributeGroups = () => {
+  const colorGroup =
+    colors.value.length > 0
+      ? {
+          id: 'color-group',
+          name: 'Màu sắc',
+          icon: getGroupIcon('Màu sắc'),
+          attrTypes: [
+            {
+              id: 'color-type',
+              label: 'Màu sắc',
+              color: 'pink',
+              options: colors.value.map((c) => ({
+                label: c.name,
+                value: c.name,
+                hex: c.hex_code,
+              })),
+            },
+          ],
+        }
+      : null
+
+  attributeGroups.value = colorGroup
+    ? [...baseAttributeGroups.value, colorGroup]
+    : [...baseAttributeGroups.value]
+
+  if (!selectedGroupId.value && attributeGroups.value.length > 0) {
+    selectedGroupId.value = attributeGroups.value[0].id
+  }
+}
+
+const normalizeAttributeGroups = (payload) => {
+  const nhoms = Array.isArray(payload) ? payload : []
+
+  baseAttributeGroups.value = nhoms.map((group) => {
+    const thuocTinhs = Array.isArray(group.thuoc_tinhs)
+      ? group.thuoc_tinhs
+      : Array.isArray(group.thuocTinhs)
+        ? group.thuocTinhs
+        : []
+
+    return {
+      id: group.id_nhom,
+      name: group.ten_nhom,
+      icon: getGroupIcon(group.ten_nhom),
+      attrTypes: thuocTinhs.map((attr) => {
+        const giaTris = Array.isArray(attr.giatri_thuoc_tinhs)
+          ? attr.giatri_thuoc_tinhs
+          : Array.isArray(attr.giatriThuocTinhs)
+            ? attr.giatriThuocTinhs
+            : []
+
+        return {
+          id: attr.id_thuoctinh,
+          label: attr.ten_thuoctinh,
+          color: getTypeColor(attr.ten_thuoctinh),
+          options: giaTris.map((item) => item.giatri),
+        }
+      }),
+    }
+  })
+
+  buildAttributeGroups()
+}
+
+const fetchAttributeGroups = async () => {
+  variantLoading.value = true
+
+  try {
+    const res = await api.get('/thuoctinh-all')
+    normalizeAttributeGroups(res.data)
+
+    if (!selectedGroupId.value && attributeGroups.value.length > 0) {
+      selectedGroupId.value = attributeGroups.value[0].id
+    }
+  } catch (error) {
+    formError.value = getErrorMessage(error, 'Không tải được dữ liệu biến thể.')
+  } finally {
+    variantLoading.value = false
+  }
+}
+
+/* ═══════════════════════════════════════
+   MODAL & FORM
+═══════════════════════════════════════ */
 const showModal = ref(false)
 const formError = ref('')
+const isEditMode = ref(false)
+const editingProductId = ref(null)
 const imgPreview = ref('')
 const fileInputRef = ref(null)
+const extraFileInputRef = ref(null)
+const extraImagePreviews = ref([])
 
 const defaultForm = () => ({
-  name: '', sku: '', category: '', price: '', stock: '', status: 'Đang bán', img: ''
+  name: '',
+  category: '',
+  brand: '',
+  status: 'Đang bán',
+  img: '',
+  images: [],
+  weight: '',
 })
+
 const form = ref(defaultForm())
 
-/* ───────────── DỮ LIỆU BIẾN THỂ ───────────── */
-const attributeGroups = ref([
-  {
-    id: 1, name: 'Cấu hình Laptop', icon: '⚙️',
-    attrs: [
-      { id: 101, name: 'RAM 8GB',        type: 'RAM' },
-      { id: 102, name: 'RAM 16GB',       type: 'RAM' },
-      { id: 103, name: 'RAM 32GB',       type: 'RAM' },
-      { id: 104, name: 'SSD 256GB',      type: 'Ổ cứng' },
-      { id: 105, name: 'SSD 512GB',      type: 'Ổ cứng' },
-      { id: 106, name: 'SSD 1TB',        type: 'Ổ cứng' },
-      { id: 107, name: 'Intel Core i5',  type: 'CPU' },
-      { id: 108, name: 'Intel Core i7',  type: 'CPU' },
-      { id: 109, name: 'Apple M3 Pro',   type: 'CPU' },
-    ]
-  },
-  {
-    id: 2, name: 'Màn hình', icon: '🖥️',
-    attrs: [
-      { id: 201, name: '13.3 inch FHD',  type: 'Kích thước' },
-      { id: 202, name: '14 inch 2K',     type: 'Kích thước' },
-      { id: 203, name: '15.6 inch FHD',  type: 'Kích thước' },
-      { id: 204, name: '16 inch Retina', type: 'Kích thước' },
-    ]
-  },
-  {
-    id: 3, name: 'Pin & Sạc', icon: '🔋',
-    attrs: [
-      { id: 301, name: 'Pin 45Wh',           type: 'Dung lượng' },
-      { id: 302, name: 'Pin 70Wh',           type: 'Dung lượng' },
-      { id: 303, name: 'Sạc 45W',            type: 'Adapter' },
-      { id: 304, name: 'Sạc 67W',            type: 'Adapter' },
-      { id: 305, name: 'Sạc 96W MagSafe',    type: 'Adapter' },
-    ]
-  },
-  {
-    id: 4, name: 'Kết nối', icon: '📡',
-    attrs: [
-      { id: 401, name: 'WiFi 6',                  type: 'WiFi' },
-      { id: 402, name: 'WiFi 6E',                 type: 'WiFi' },
-      { id: 403, name: 'Bluetooth 5.0',           type: 'Bluetooth' },
-      { id: 404, name: 'Bluetooth 5.3',           type: 'Bluetooth' },
-      { id: 405, name: 'USB-C Thunderbolt 4',     type: 'Cổng' },
-    ]
-  },
-  {
-    id: 5, name: 'Phụ kiện', icon: '🖱️',
-    attrs: [
-      { id: 501, name: 'Chuột không dây', type: 'Chuột' },
-      { id: 502, name: 'Bàn phím cơ',    type: 'Bàn phím' },
-      { id: 503, name: 'Túi chống sốc',  type: 'Túi' },
-    ]
-  },
-])
-
-const colorList = ref([
-  { id: 1, name: 'Space Black', hex: '#1a1a1a' },
-  { id: 2, name: 'Silver',      hex: '#C0C0C0' },
-  { id: 3, name: 'Midnight',    hex: '#1c2951' },
-  { id: 4, name: 'Starlight',   hex: '#e8dcc8' },
-  { id: 5, name: 'Rose Gold',   hex: '#c9768f' },
-  { id: 6, name: 'Pacific Blue',hex: '#1f4f8a' },
-])
-
-/* ───────────── VARIANT STATE ───────────── */
-const variantStep        = ref(1)   // 1=chọn nhóm | 2=chọn loại | 3=cấu hình bảng
-const selectedGroupId    = ref(null)
-const selectedAttrIds    = ref([])
-const variantRows        = ref([])
-const configuredGroups   = ref([])  // các nhóm đã xác nhận
-
-const activeGroup = computed(() =>
-  attributeGroups.value.find(g => g.id === selectedGroupId.value) || null
-)
-
-const attrsByType = computed(() => {
-  if (!activeGroup.value) return {}
-  return activeGroup.value.attrs.reduce((acc, a) => {
-    if (!acc[a.type]) acc[a.type] = []
-    acc[a.type].push(a)
-    return acc
-  }, {})
-})
-
-const selectedAttrs = computed(() =>
-  activeGroup.value
-    ? activeGroup.value.attrs.filter(a => selectedAttrIds.value.includes(a.id))
-    : []
-)
-
-const goStep2 = (groupId) => {
-  selectedGroupId.value = groupId
-  selectedAttrIds.value = []
-  variantStep.value = 2
-}
-
-const toggleAttr = (id) => {
-  const idx = selectedAttrIds.value.indexOf(id)
-  if (idx >= 0) selectedAttrIds.value.splice(idx, 1)
-  else selectedAttrIds.value.push(id)
-}
-
-const goStep3 = () => {
-  if (!selectedAttrIds.value.length) return
-  variantRows.value = selectedAttrs.value.map(attr => ({
-    id: Date.now() + attr.id,
-    attrName: attr.name,
-    attrType: attr.type,
-    color: '',
-    price: '',
-    stock: 0,
-    sku: '',
-  }))
-  variantStep.value = 3
-}
-
-const backStep1 = () => {
-  selectedGroupId.value = null
-  selectedAttrIds.value = []
-  variantStep.value = 1
-}
-const backStep2 = () => { variantStep.value = 2 }
-
-const addVariantRow = () => {
-  variantRows.value.push({
-    id: Date.now(),
-    attrName: '', attrType: '', color: '', price: '', stock: 0, sku: ''
-  })
-}
-const removeVariantRow = (i) => {
-  if (variantRows.value.length > 1) variantRows.value.splice(i, 1)
-}
-
-const confirmVariants = () => {
-  const existing = configuredGroups.value.findIndex(cg => cg.groupName === activeGroup.value.name)
-  const entry = {
-    groupName: activeGroup.value.name,
-    groupIcon: activeGroup.value.icon,
-    rows: variantRows.value.map(r => ({ ...r }))
-  }
-  if (existing >= 0) configuredGroups.value[existing] = entry
-  else configuredGroups.value.push(entry)
-  backStep1()
-}
-
-const removeConfiguredGroup = (i) => configuredGroups.value.splice(i, 1)
-
-/* ───────────── ẢNH SẢN PHẨM ───────────── */
-const onFileChange = (e) => {
+const onFileChange = e => {
   const file = e.target.files[0]
   if (!file) return
-  const reader = new FileReader()
-  reader.onload = (ev) => {
+
+  const r = new FileReader()
+  r.onload = ev => {
     imgPreview.value = ev.target.result
     form.value.img = ev.target.result
   }
-  reader.readAsDataURL(file)
+  r.readAsDataURL(file)
 }
-const triggerFileInput = () => fileInputRef.value.click()
+
+const onExtraFilesChange = async (e) => {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+
+  readingExtraImages.value = true
+
+  try {
+    const base64Images = await Promise.all(
+      files.map(file => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader()
+
+          reader.onload = (ev) => resolve(ev.target.result)
+          reader.onerror = () => reject(new Error('Không đọc được file ảnh'))
+
+          reader.readAsDataURL(file)
+        })
+      })
+    )
+
+    form.value.images = [...form.value.images, ...files]
+    extraImagePreviews.value = [...extraImagePreviews.value, ...base64Images]
+  } catch (error) {
+    console.error(error)
+    alert('Không đọc được một hoặc nhiều ảnh phụ')
+  } finally {
+    readingExtraImages.value = false
+
+    if (extraFileInputRef.value) {
+      extraFileInputRef.value.value = ''
+    }
+  }
+}
+
+const triggerFileInput = () => fileInputRef.value?.click()
+const triggerExtraFileInput = () => extraFileInputRef.value?.click()
+
 const removeImg = () => {
   imgPreview.value = ''
   form.value.img = ''
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
-/* ───────────── OPEN / CLOSE ───────────── */
+const removeExtraImage = index => {
+  extraImagePreviews.value.splice(index, 1)
+  form.value.images.splice(index, 1)
+
+  if (form.value.images.length === 0 && extraFileInputRef.value) {
+    extraFileInputRef.value.value = ''
+  }
+}
+
+/* ═══════════════════════════════════════
+   VARIANT STATE — FLAT TABLE + COMBO FLOW
+═══════════════════════════════════════ */
+const vsPhase = ref(1)
+const selectedGroupId = ref(null)
+const selectedOptions = ref({})
+const generatedRows = ref([])
+const editVariantHeaders = ref([])
+const bulkPrice = ref('')
+const bulkStock = ref('')
+
+const selectedGroup = computed(() =>
+  attributeGroups.value.find(g => g.id === selectedGroupId.value) || null
+)
+
+const allAttrTypes = computed(() => {
+  return attributeGroups.value.flatMap(group =>
+    (group.attrTypes || []).map(type => ({
+      ...type,
+      groupId: group.id,
+      groupName: group.name,
+    }))
+  )
+})
+
+const activeAttrTypes = computed(() => {
+  return allAttrTypes.value.filter(
+    t => selectedOptions.value[t.id]?.size > 0
+  )
+})
+const tableHeaders = computed(() => {
+  if (!isEditMode.value) return activeAttrTypes.value
+
+  return editVariantHeaders.value.map((label, index) => ({
+    id: `attr_${index}`,
+    label,
+    color: colorPool[index % colorPool.length],
+  }))
+})
+const totalSelected = computed(() =>
+  Object.values(selectedOptions.value).reduce((s, set) => s + (set?.size ?? 0), 0)
+)
+
+const comboCount = computed(() => {
+  if (activeAttrTypes.value.length === 0) return 0
+  return activeAttrTypes.value.reduce(
+    (prod, t) => prod * (selectedOptions.value[t.id]?.size ?? 0),
+    1
+  )
+})
+
+const selectGroup = groupId => {
+  if (selectedGroupId.value === groupId) return
+  selectedGroupId.value = groupId
+}
+
+const displayAttrTypes = computed(() => {
+  if (!selectedGroup.value) return []
+  return selectedGroup.value.attrTypes || []
+})
+
+const getOptionValue = (opt) => typeof opt === 'object' ? opt.value : opt
+const getOptionLabel = (opt) => typeof opt === 'object' ? opt.label : opt
+const getOptionHex = (opt) => typeof opt === 'object' ? opt.hex : null
+
+const toggleOption = (typeId, value) => {
+  if (!selectedOptions.value[typeId]) selectedOptions.value[typeId] = new Set()
+  const set = selectedOptions.value[typeId]
+  if (set.has(value)) set.delete(value)
+  else set.add(value)
+  selectedOptions.value = { ...selectedOptions.value }
+}
+
+const isSelected = (typeId, value) =>
+  selectedOptions.value[typeId]?.has(value) ?? false
+
+const selectedCountInGroup = g =>
+  g.attrTypes.reduce((s, t) => s + (selectedOptions.value[t.id]?.size ?? 0), 0)
+
+const cartesian = arrays => {
+  if (arrays.length === 0) return [[]]
+  const [first, ...rest] = arrays
+  const tail = cartesian(rest)
+  return first.flatMap(v => tail.map(c => [v, ...c]))
+}
+
+const generateVariants = () => {
+  if (!activeAttrTypes.value.length) return
+  const arrays = activeAttrTypes.value.map(t => [...selectedOptions.value[t.id]])
+  const combos = cartesian(arrays)
+  generatedRows.value = combos.map((combo, i) => {
+    const attrs = {}
+    activeAttrTypes.value.forEach((t, ti) => { attrs[t.id] = combo[ti] })
+    return { id: Date.now() + i, attrs, price: '', stock: 0 }
+  })
+  vsPhase.value = 2
+}
+
+const backToSelect = () => { vsPhase.value = 1 }
+const removeRow = i => { if (generatedRows.value.length > 1) generatedRows.value.splice(i, 1) }
+
+const applyBulkAll = () => {
+  generatedRows.value.forEach(r => {
+    if (bulkPrice.value) r.price = bulkPrice.value
+    if (bulkStock.value !== '') r.stock = Number(bulkStock.value)
+  })
+}
+
+/* ═══════════════════════════════════════
+   OPEN / CLOSE / SUBMIT
+═══════════════════════════════════════ */
+const openEditModal = async (id) => {
+  try {
+    formError.value = ''
+    resetForm()
+
+    const res = await api.get(`/sanpham/${id}`)
+    const product = res.data
+
+    isEditMode.value = true
+    editingProductId.value = id
+
+    mapProductToForm(product)
+    showModal.value = true
+  } catch (error) {
+    console.error(error)
+    alert(getErrorMessage(error, 'Không tải được thông tin sản phẩm để sửa.'))
+  }
+}
+const mapProductToForm = (product) => {
+  form.value = {
+    name: product?.tenSP || '',
+    category: product?.id_danhmuc ? String(product.id_danhmuc) : '',
+    brand: product?.id_thuonghieu ? String(product.id_thuonghieu) : '',
+    status: String(product?.trangthai) === '1' ? 'Đang bán' : 'Nháp',
+    img: '',
+    images: [],
+    weight: product?.khoiluong ?? '',
+  }
+
+  imgPreview.value = product?.hinhanh
+    ? `http://127.0.0.1:8000/storage/${product.hinhanh}`
+    : ''
+
+  extraImagePreviews.value = Array.isArray(product?.hinh_anhs)
+    ? product.hinh_anhs.map(img => `http://127.0.0.1:8000/storage/${img.duongdan}`)
+    : []
+
+  const bienThes = Array.isArray(product?.bien_thes) ? product.bien_thes : []
+
+  generatedRows.value = bienThes.map((row, i) => {
+    const parts = String(row.ten_bienthe || '').split(' - ').filter(Boolean)
+
+    const attrs = {}
+    parts.forEach((part, index) => {
+      attrs[`attr_${index}`] = part
+    })
+
+    return {
+      id: row.id_bienthe ?? Date.now() + i,
+      attrs,
+      price: row.gia ?? '',
+      stock: row.soluong ?? 0,
+      ten_bienthe: row.ten_bienthe ?? '',
+      isExisting: true,
+    }
+  })
+
+  const maxParts = bienThes.reduce((max, row) => {
+    const count = String(row.ten_bienthe || '').split(' - ').filter(Boolean).length
+    return Math.max(max, count)
+  }, 0)
+
+  editVariantHeaders.value = Array.from({ length: maxParts }, (_, i) => `Thuộc tính ${i + 1}`)
+
+  selectedOptions.value = {}
+  vsPhase.value = 2
+}
 const openModal = () => {
   form.value = defaultForm()
   imgPreview.value = ''
+  extraImagePreviews.value = []
   formError.value = ''
-  variantStep.value = 1
+
+  vsPhase.value = 1
+  selectedOptions.value = {}
+  generatedRows.value = []
+  bulkPrice.value = ''
+  bulkStock.value = ''
+  isEditMode.value = false
+  editingProductId.value = null
+  resetForm()
+  showModal.value = true
   selectedGroupId.value = null
-  selectedAttrIds.value = []
-  variantRows.value = []
-  configuredGroups.value = []
+
+  if (attributeGroups.value.length > 0) {
+    selectedGroupId.value = attributeGroups.value[0].id
+  }
+
+  if (fileInputRef.value) fileInputRef.value.value = ''
+  if (extraFileInputRef.value) extraFileInputRef.value.value = ''
+
   showModal.value = true
 }
+
 const closeModal = () => { showModal.value = false }
 
-const submitForm = () => {
-  if (!form.value.name.trim())     { formError.value = 'Vui lòng nhập tên sản phẩm.'; return }
-  if (!form.value.sku.trim())      { formError.value = 'Vui lòng nhập SKU.'; return }
-  if (!form.value.category)        { formError.value = 'Vui lòng chọn danh mục.'; return }
-  if (!form.value.price.trim())    { formError.value = 'Vui lòng nhập giá.'; return }
-  if (!form.value.stock)           { formError.value = 'Vui lòng nhập số lượng kho.'; return }
-  products.value.unshift({
-    name: form.value.name.trim(),
-    sku: form.value.sku.trim(),
-    category: form.value.category,
-    price: form.value.price.trim(),
-    stock: Number(form.value.stock),
-    status: form.value.status,
-    img: form.value.img || 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200'
-  })
-  closeModal()
+const submitForm = async () => {
+  try {
+    const payload = {
+      id_danhmuc: Number(form.value.category),
+      id_thuonghieu: Number(form.value.brand),
+      tenSP: form.value.name.trim(),
+      trangthai: form.value.status === 'Đang bán' ? 1 : 0,
+      hinhanh: form.value.img || imgPreview.value || '',
+      khoiluong: form.value.weight ? Number(form.value.weight) : null,
+
+      hinh_anhs: extraImagePreviews.value.map((img, index) => ({
+        duongdan: img,
+        thutu: index,
+      })),
+
+      bienthes: generatedRows.value.map((row) => ({
+        ten_bienthe: row.ten_bienthe || Object.values(row.attrs || {}).join(' - '),
+        gia: Number(row.price) || 0,
+        soluong: Number(row.stock) || 0,
+      })),
+    }
+
+    if (isEditMode.value && editingProductId.value) {
+      await api.put(`/sanpham/${editingProductId.value}`, payload)
+      alert('Cập nhật sản phẩm thành công')
+    } else {
+      await api.post('/sanpham', payload)
+      alert('Thêm sản phẩm thành công')
+    }
+
+    await fetchProducts()
+    resetForm()
+    closeModal()
+  } catch (error) {
+    console.error(error)
+    alert(getErrorMessage(error, isEditMode.value
+      ? 'Có lỗi xảy ra khi cập nhật sản phẩm'
+      : 'Có lỗi xảy ra khi thêm sản phẩm'))
+  }
 }
 
-/* ───────────── MODAL THÊM MÀU ───────────── */
-const showColorModal = ref(false)
-const colorForm = ref({ name: '', hex: '#000000' })
-const openColorModal  = () => { colorForm.value = { name: '', hex: '#000000' }; showColorModal.value = true }
-const closeColorModal = () => { showColorModal.value = false }
-const submitColor = () => {
-  if (!colorForm.value.name.trim()) return
-  colorList.value.push({ id: Date.now(), name: colorForm.value.name.trim(), hex: colorForm.value.hex })
-  closeColorModal()
-}
+onMounted(() => {
+  fetchProducts()
+  fetchCategories()
+  fetchBrands()
+  fetchAttributeGroups()
+  fetchColors()
+})
 </script>
 
 <template>
   <div class="admin">
 
-    <!-- HEADER -->
     <div class="top">
       <div>
         <h1>Quản lý sản phẩm</h1>
@@ -288,31 +668,35 @@ const submitColor = () => {
       <button class="add-btn" @click="openModal">+ Thêm sản phẩm</button>
     </div>
 
-    <!-- STATS -->
     <div class="stats">
-      <div class="stat-card">
-        <span class="stat-icon blue">📦</span>
-        <div><p>Tổng sản phẩm</p><b>1,284</b></div>
+      <div class="stat-card"><span class="stat-icon blue">📦</span>
+        <div>
+          <p>Tổng sản phẩm</p><b>1,284</b>
+        </div>
       </div>
-      <div class="stat-card">
-        <span class="stat-icon green">🔥</span>
-        <div><p>Bán chạy</p><b>312</b></div>
+      <div class="stat-card"><span class="stat-icon green">🔥</span>
+        <div>
+          <p>Bán chạy</p><b>312</b>
+        </div>
       </div>
-      <div class="stat-card">
-        <span class="stat-icon red">⚠️</span>
-        <div><p>Sắp hết hàng</p><b>18</b></div>
+      <div class="stat-card"><span class="stat-icon red">⚠️</span>
+        <div>
+          <p>Sắp hết hàng</p><b>18</b>
+        </div>
       </div>
-      <div class="stat-card">
-        <span class="stat-icon purple">🏭</span>
-        <div><p>Kho lưu trữ</p><b>45</b></div>
+      <div class="stat-card"><span class="stat-icon purple">🏭</span>
+        <div>
+          <p>Kho lưu trữ</p><b>45</b>
+        </div>
       </div>
     </div>
 
-    <!-- FILTER -->
     <div class="filter-bar">
       <div class="search-wrap">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.35-4.35" />
         </svg>
         <input v-model="searchQuery" placeholder="Tìm kiếm tên sản phẩm, SKU..." />
       </div>
@@ -321,29 +705,39 @@ const submitColor = () => {
         <option>Đang bán</option>
         <option>Nháp</option>
       </select>
-      <select>
-        <option>Tất cả danh mục</option>
-        <option>Máy tính xách tay</option>
-        <option>Điện thoại</option>
-        <option>Máy tính bảng</option>
-        <option>Phụ kiện</option>
+      <select v-model="selectedCategory">
+        <option value="">Tất cả danh mục</option>
+        <option
+          v-for="category in categories"
+          :key="category.id_danhmuc"
+          :value="category.id_danhmuc"
+        >
+          {{ category.ten_danhmuc }}
+        </option>
       </select>
     </div>
 
-    <!-- TABLE -->
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Sản phẩm</th><th>Danh mục</th><th>Giá niêm yết</th>
-            <th>Kho hàng</th><th>Trạng thái</th><th>Thao tác</th>
+            <th>STT</th>
+            <th>Sản phẩm</th>
+            <th>Danh mục</th>
+            <th>Thương hiệu</th>
+            <th>Tổng biến thể</th>
+            <th>Trạng thái</th>
+            <th>Thao tác</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="filteredProducts.length === 0">
-            <td colspan="6" class="empty">Không tìm thấy sản phẩm nào.</td>
+          <tr v-if="!paginatedProducts.length">
+            <td colspan="7" class="empty">Không tìm thấy sản phẩm nào.</td>
           </tr>
-          <tr v-for="(p, i) in filteredProducts" :key="i">
+          <tr v-for="(p, i) in paginatedProducts" :key="p.id">
+            <td>
+              {{ (currentPage - 1) * PER_PAGE + i + 1 }}
+            </td>
             <td>
               <div class="product-cell">
                 <img :src="p.img" :alt="p.name" />
@@ -351,34 +745,27 @@ const submitColor = () => {
               </div>
             </td>
             <td><span class="badge">{{ p.category }}</span></td>
-            <td><span class="price">{{ p.price }} ₫</span></td>
+            <td><span class="price">{{ p.brand }}</span></td>
             <td>
               <div class="stock-cell">
-                <span>{{ p.stock }}</span>
-                <div class="bar"><div class="fill" :style="{ width: stockPercent(p.stock) + '%' }"></div></div>
+                <span>{{ p.totalVariants }} biến thể</span>
               </div>
             </td>
-            <td>
-              <span class="status-badge" :class="p.status === 'Đang bán' ? 'active' : 'draft'">{{ p.status }}</span>
+            <td><span class="status-badge" :class="p.status === 'Đang bán' ? 'active' : 'draft'">{{ p.status }}</span>
             </td>
             <td>
               <div class="actions">
-                <button class="act-btn" title="Xem">
+                <button class="act-btn" title="Sửa" @click="openEditModal(p.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </button>
-                <button class="act-btn" title="Sửa">
+                <button class="act-btn danger" title="Xóa" @click="removeProduct(p.id)">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                </button>
-                <button class="act-btn danger" title="Xóa" @click="removeProduct(i)">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                    <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                   </svg>
                 </button>
               </div>
@@ -388,37 +775,41 @@ const submitColor = () => {
       </table>
     </div>
 
-    <!-- PAGINATION -->
     <div class="pagination">
-      <button>‹</button>
-      <button class="active">1</button>
-      <button>2</button>
-      <button>3</button>
-      <button>›</button>
+      <button :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">‹</button>
+
+      <button
+        v-for="(p, index) in pageItems"
+        :key="`${p}-${index}`"
+        :class="{ 'pg-active': p === currentPage, 'pg-dots': p === '...' }"
+        :disabled="p === '...'"
+        @click="p !== '...' && goToPage(p)"
+      >
+        {{ p }}
+      </button>
+
+      <button :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">›</button>
     </div>
 
-    <!-- ═══════════════════════════════════════════════
-         MODAL THÊM SẢN PHẨM
-    ════════════════════════════════════════════════ -->
     <Teleport to="body">
       <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
         <div class="modal modal-wide">
 
           <div class="modal-header">
-            <h3>Thêm sản phẩm mới</h3>
+            <h3>{{ isEditMode ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới' }}</h3>
             <button class="modal-close" @click="closeModal">×</button>
           </div>
 
           <div class="modal-body">
 
-            <!-- ── ẢNH ── -->
             <div class="form-group">
               <label>Ảnh sản phẩm</label>
               <input ref="fileInputRef" type="file" accept="image/*" style="display:none" @change="onFileChange" />
               <div v-if="!imgPreview" class="upload-zone" @click="triggerFileInput">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
                 <p>Kéo thả hoặc <span>bấm để chọn ảnh</span></p>
                 <small>PNG, JPG, WEBP — tối đa 5MB</small>
@@ -432,27 +823,65 @@ const submitColor = () => {
               </div>
             </div>
 
-            <!-- ── THÔNG TIN CƠ BẢN ── -->
+            <div class="form-group">
+              <label>Hình ảnh phụ</label>
+              <input
+                ref="extraFileInputRef"
+                type="file"
+                accept="image/*"
+                multiple
+                style="display:none"
+                @change="onExtraFilesChange"
+              />
+              <div class="upload-zone" @click="triggerExtraFileInput">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <p>Kéo thả hoặc <span>bấm để chọn nhiều ảnh</span></p>
+                <small>PNG, JPG, WEBP — có thể chọn nhiều ảnh</small>
+              </div>
+
+              <div v-if="extraImagePreviews.length" class="multi-preview-wrap">
+                <div v-for="(img, index) in extraImagePreviews" :key="index" class="multi-preview-item">
+                  <img :src="img" class="multi-preview-img" :alt="`preview-${index}`" />
+                  <button class="multi-preview-remove" @click="removeExtraImage(index)">×</button>
+                </div>
+              </div>
+            </div>
+
             <div class="form-row">
               <div class="form-group">
                 <label>Tên sản phẩm <span class="required">*</span></label>
                 <input v-model="form.name" placeholder="VD: VinaPro Laptop X2" />
               </div>
               <div class="form-group">
-                <label>SKU <span class="required">*</span></label>
-                <input v-model="form.sku" placeholder="VD: VN-LP-2027" />
+                <label>Thương hiệu <span class="required">*</span></label>
+                <select v-model="form.brand">
+                  <option value="">-- Chọn thương hiệu --</option>
+                  <option
+                    v-for="brand in brands"
+                    :key="brand.id_thuonghieu"
+                    :value="brand.id_thuonghieu"
+                  >
+                    {{ brand.ten_thuonghieu }}
+                  </option>
+                </select>
               </div>
             </div>
-
             <div class="form-row">
               <div class="form-group">
                 <label>Danh mục <span class="required">*</span></label>
                 <select v-model="form.category">
                   <option value="">-- Chọn danh mục --</option>
-                  <option>Máy tính xách tay</option>
-                  <option>Điện thoại</option>
-                  <option>Máy tính bảng</option>
-                  <option>Phụ kiện</option>
+                  <option
+                    v-for="category in categories"
+                    :key="category.id_danhmuc"
+                    :value="category.id_danhmuc"
+                  >
+                    {{ category.ten_danhmuc }}
+                  </option>
                 </select>
               </div>
               <div class="form-group">
@@ -463,182 +892,193 @@ const submitColor = () => {
                 </select>
               </div>
             </div>
-
             <div class="form-row">
               <div class="form-group">
-                <label>Giá niêm yết <span class="required">*</span></label>
-                <input v-model="form.price" placeholder="VD: 45.990.000" />
+                <label>Khối lượng</label>
+                <input v-model="form.weight" type="number" min="0" step="0.01" placeholder="VD: 2.5" />
               </div>
               <div class="form-group">
-                <label>Số lượng kho <span class="required">*</span></label>
-                <input v-model="form.stock" type="number" min="0" placeholder="VD: 100" />
+                <label>&nbsp;</label>
+                <div></div>
               </div>
             </div>
 
-            <!-- ══════════════════════════════════════
-                 PHẦN BIẾN THỂ 3 BƯỚC
-            ═══════════════════════════════════════ -->
             <div class="vs-wrapper">
-
-              <!-- TIÊU ĐỀ SECTION -->
-              <div class="vs-header-row">
-                <div class="vs-section-title">
+              <div class="vs-header">
+                <div class="vs-title">
                   <span class="vs-bar"></span>
                   Biến thể sản phẩm
                 </div>
-                <!-- Tóm tắt nhóm đã cấu hình -->
-                <div v-if="configuredGroups.length" class="configured-chips">
-                  <div v-for="(cg, ci) in configuredGroups" :key="ci" class="configured-chip">
-                    <span>{{ cg.groupIcon }} {{ cg.groupName }}</span>
-                    <span class="chip-count">{{ cg.rows.length }} biến thể</span>
-                    <button class="chip-remove" @click="removeConfiguredGroup(ci)">×</button>
-                  </div>
+                <div class="vs-steps">
+                  <span class="vss" :class="{ active: vsPhase === 1, done: vsPhase === 2 }">
+                    <span class="vss-dot">{{ vsPhase === 2 ? '✓' : '1' }}</span>
+                    Chọn giá trị
+                  </span>
+                  <span class="vss-line"></span>
+                  <span class="vss" :class="{ active: vsPhase === 2 }">
+                    <span class="vss-dot">2</span>
+                    Điền giá &amp; kho
+                  </span>
                 </div>
               </div>
 
-              <!-- BREADCRUMB STEPS -->
-              <div class="vs-steps">
-                <div class="vs-step" :class="{ 'step-active': variantStep >= 1, 'step-done': variantStep > 1 }">
-                  <span class="step-dot">
-                    <svg v-if="variantStep > 1" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-                    <span v-else>1</span>
-                  </span>
-                  <span class="step-label">Nhóm thuộc tính</span>
+              <template v-if="vsPhase === 1 && !isEditMode">
+                <div v-if="variantLoading" class="group-placeholder">
+                  <span>Đang tải dữ liệu biến thể...</span>
                 </div>
-                <div class="step-line" :class="{ 'line-done': variantStep > 1 }"></div>
-                <div class="vs-step" :class="{ 'step-active': variantStep >= 2, 'step-done': variantStep > 2 }">
-                  <span class="step-dot">
-                    <svg v-if="variantStep > 2" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-                    <span v-else>2</span>
-                  </span>
-                  <span class="step-label">Loại thuộc tính</span>
-                </div>
-                <div class="step-line" :class="{ 'line-done': variantStep > 2 }"></div>
-                <div class="vs-step" :class="{ 'step-active': variantStep >= 3 }">
-                  <span class="step-dot"><span>3</span></span>
-                  <span class="step-label">Cấu hình biến thể</span>
-                </div>
-              </div>
-
-              <!-- ────────────────────────────────────
-                   STEP 1: CHỌN NHÓM THUỘC TÍNH
-              ──────────────────────────────────── -->
-              <div v-if="variantStep === 1" class="step-body">
-                <p class="step-hint">Chọn một nhóm thuộc tính để bắt đầu cấu hình biến thể. Bạn có thể thêm nhiều nhóm.</p>
-                <div class="group-grid">
-                  <button
-                    v-for="g in attributeGroups"
-                    :key="g.id"
-                    class="group-card"
-                    :class="{ 'group-done': configuredGroups.some(cg => cg.groupName === g.name) }"
-                    @click="goStep2(g.id)"
-                  >
-                    <span class="group-icon">{{ g.icon }}</span>
-                    <div class="group-info">
-                      <b>{{ g.name }}</b>
-                      <span>{{ g.attrs.length }} thuộc tính</span>
-                    </div>
-                    <span v-if="configuredGroups.some(cg => cg.groupName === g.name)" class="group-check">✓ Đã cấu hình</span>
-                    <span v-else class="group-arrow">›</span>
+                <div v-else class="group-tabs">
+                  <button v-for="g in attributeGroups" :key="g.id" class="gtab"
+                    :class="{ 'gtab-active': selectedGroupId === g.id }" @click="selectGroup(g.id)">
+                    <span class="gtab-icon">{{ g.icon }}</span>
+                    <span class="gtab-name">{{ g.name }}</span>
+                    <span v-if="selectedCountInGroup(g) > 0" class="gtab-badge">
+                      {{ selectedCountInGroup(g) }}
+                    </span>
                   </button>
                 </div>
-              </div>
 
-              <!-- ────────────────────────────────────
-                   STEP 2: CHỌN LOẠI THUỘC TÍNH
-              ──────────────────────────────────── -->
-              <div v-if="variantStep === 2" class="step-body">
-                <div class="step-nav">
-                  <button class="back-btn" @click="backStep1">‹ Quay lại</button>
-                  <span class="step-nav-title">{{ activeGroup?.icon }} {{ activeGroup?.name }}</span>
-                </div>
-                <p class="step-hint">Tick chọn các loại thuộc tính bạn muốn tạo biến thể. Có thể chọn nhiều loại.</p>
-
-                <div class="attr-type-blocks">
-                  <div v-for="(attrs, typeName) in attrsByType" :key="typeName" class="attr-type-block">
-                    <div class="attr-type-label">
-                      <span class="type-dot"></span>{{ typeName }}
+                <div v-if="displayAttrTypes.length" class="flat-select-table">
+                  <div v-for="t in displayAttrTypes" :key="t.id" class="fst-row">
+                    <div class="fst-label">
+                      <span class="type-pill" :class="'tp-' + t.color">{{ t.label }}</span>
+                      <span v-if="selectedOptions[t.id]?.size" class="fst-count">
+                        {{ selectedOptions[t.id].size }}
+                      </span>
                     </div>
-                    <div class="attr-chip-list">
+
+                    <div class="fst-options">
                       <button
-                        v-for="attr in attrs"
-                        :key="attr.id"
-                        class="attr-chip"
-                        :class="{ 'attr-chip-on': selectedAttrIds.includes(attr.id) }"
-                        @click="toggleAttr(attr.id)"
+                        v-for="opt in t.options"
+                        :key="getOptionValue(opt)"
+                        class="vbtn"
+                        :class="['vbtn-' + t.color, { 'vbtn-on': isSelected(t.id, getOptionValue(opt)) }]"
+                        @click="toggleOption(t.id, getOptionValue(opt))"
                       >
-                        <span class="chip-tick" v-if="selectedAttrIds.includes(attr.id)">
-                          <svg viewBox="0 0 12 12" fill="none" width="10" height="10">
-                            <polyline points="2,6 5,9 10,3" stroke="#2563eb" stroke-width="2" stroke-linecap="round"/>
-                          </svg>
+                        <svg
+                          v-if="isSelected(t.id, getOptionValue(opt))"
+                          viewBox="0 0 10 10"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2.2"
+                          stroke-linecap="round"
+                          width="9"
+                          height="9"
+                        >
+                          <polyline points="1,5 3.5,7.5 9,2" />
+                        </svg>
+
+                        <span v-if="getOptionHex(opt)" class="color-option">
+                          <span class="color-dot" :style="{ background: getOptionHex(opt) }"></span>
+                          {{ getOptionLabel(opt) }}
                         </span>
-                        {{ attr.name }}
+                        <span v-else>
+                          {{ getOptionLabel(opt) }}
+                        </span>
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <div class="step2-footer">
-                  <span class="selected-count">Đã chọn: <b>{{ selectedAttrIds.length }}</b> thuộc tính</span>
-                  <button class="btn-next" :disabled="!selectedAttrIds.length" @click="goStep3">
-                    Tiếp theo: Cấu hình biến thể →
+                <div v-else class="group-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"
+                    width="28" height="28">
+                    <rect x="3" y="3" width="18" height="18" rx="3" />
+                    <path d="M9 12h6M12 9v6" />
+                  </svg>
+                  <span>Không có dữ liệu loại thuộc tính</span>
+                </div>
+
+                <div v-if="selectedGroup" class="p1-footer">
+                  <div v-if="activeAttrTypes.length > 0" class="combo-bar">
+                    <span class="combo-formula">
+                      <template v-for="(t, i) in activeAttrTypes" :key="t.id">
+                        <span class="cf-item">
+                          <span class="type-pill-sm" :class="'tp-' + t.color">{{ t.label }}</span>
+                          <b>{{ selectedOptions[t.id]?.size }}</b>
+                        </span>
+                        <span v-if="i < activeAttrTypes.length - 1" class="cf-x">×</span>
+                      </template>
+                      <span class="cf-eq">= <b>{{ comboCount }} biến thể</b></span>
+                    </span>
+                  </div>
+
+                  <div class="p1-actions">
+                    <span v-if="!activeAttrTypes.length" class="p1-hint">
+                      Chọn ít nhất 1 giá trị từ bất kỳ loại nào
+                    </span>
+                    <button class="btn-generate" :disabled="!activeAttrTypes.length" @click="generateVariants">
+                      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2.2"
+                        stroke-linecap="round" width="13" height="13">
+                        <rect x="1" y="1" width="12" height="12" rx="2" />
+                        <polyline points="3.5,7 5.5,9 10.5,4.5" />
+                      </svg>
+                      Tạo {{ comboCount > 0 ? comboCount + ' ' : '' }}biến thể
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <template v-if="vsPhase === 2">
+                <div class="p2-toolbar">
+                  <button v-if="!isEditMode" class="btn-back" @click="vsPhase = 1">
+                    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                      width="11" height="11">
+                      <polyline points="7.5,1.5 3,6 7.5,10.5" />
+                    </svg>
+                    Chỉnh lại lựa chọn
                   </button>
+                  <div class="bulk-bar">
+                    <span class="bulk-lbl">Điền nhanh:</span>
+                    <input v-model="bulkPrice" class="bulk-in" placeholder="Giá chung" />
+                    <input v-model="bulkStock" class="bulk-in bulk-num" type="number" min="0" placeholder="Kho" />
+                    <button class="btn-apply" @click="applyBulkAll">Áp dụng tất cả</button>
+                  </div>
                 </div>
-              </div>
 
-              <!-- ────────────────────────────────────
-                   STEP 3: BẢNG BIẾN THỂ
-              ──────────────────────────────────── -->
-              <div v-if="variantStep === 3" class="step-body">
-                <div class="step-nav">
-                  <button class="back-btn" @click="backStep2">‹ Quay lại</button>
-                  <span class="step-nav-title">{{ activeGroup?.icon }} {{ activeGroup?.name }} — Cấu hình chi tiết</span>
+                <div class="p2-info">
+                  <template v-if="isEditMode">
+                    Đang hiển thị <b>{{ generatedRows.length }}</b> biến thể hiện có của sản phẩm.
+                  </template>
+                  <template v-else>
+                    Đã tạo <b>{{ generatedRows.length }}</b> tổ hợp từ
+                    <b>{{ activeAttrTypes.length }}</b> loại thuộc tính —
+                    mỗi hàng là duy nhất, không trùng lặp.
+                  </template>
                 </div>
-                <p class="step-hint">Điền thông tin cho từng biến thể. Các trường màu sắc, giá, SKU có thể để trống.</p>
 
-                <div class="vt-table-wrap">
+                <div class="vt-scroll">
                   <table class="vt-table">
                     <thead>
                       <tr>
-                        <th>LOẠI THUỘC TÍNH</th>
-                        <th>NHÓM</th>
-                        <th>MÀU SẮC</th>
-                        <th>GIÁ RIÊNG (₫)</th>
-                        <th>SỐ LƯỢNG</th>
-                        <th>SKU BIẾN THỂ</th>
-                        <th></th>
+                        <th class="th-no">#</th>
+                        <th v-for="t in tableHeaders" :key="t.id">
+                          <span class="type-pill" :class="'tp-' + t.color">{{ t.label }}</span>
+                        </th>
+                        <th class="th-price">Giá riêng (₫)</th>
+                        <th class="th-stock">Kho</th>
+                        <th class="th-act"></th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="(row, ri) in variantRows" :key="row.id">
-                        <td>
-                          <div v-if="row.attrName" class="vt-attr-tag">{{ row.attrName }}</div>
-                          <input v-else v-model="row.attrName" class="vt-input" placeholder="Nhập tên..." />
+                      <tr v-for="(row, ri) in generatedRows" :key="row.id" class="vt-row">
+                        <td class="td-no"><span class="row-no">{{ ri + 1 }}</span></td>
+                        <td v-for="t in tableHeaders" :key="t.id">
+                          <span class="val-chip" :class="'vc-' + t.color">
+                            {{ row.attrs[t.id] || '' }}
+                          </span>
                         </td>
-                        <td>
-                          <span v-if="row.attrType" class="vt-type-badge">{{ row.attrType }}</span>
-                          <span v-else class="vt-dim">—</span>
-                        </td>
-                        <td>
-                          <div class="color-select-wrap">
-                            <span
-                              v-if="row.color"
-                              class="color-dot-sm"
-                              :style="{ background: colorList.find(c=>c.name===row.color)?.hex || '#ccc' }"
-                            ></span>
-                            <select v-model="row.color" class="vt-select">
-                              <option value="">Không chọn</option>
-                              <option v-for="c in colorList" :key="c.id" :value="c.name">{{ c.name }}</option>
-                            </select>
-                          </div>
-                        </td>
-                        <td><input v-model="row.price" class="vt-input" placeholder="22.000.000" /></td>
+                        <td><input
+                            v-model.number="row.price"
+                            type="number"
+                            class="vt-input"
+                          /></td>
                         <td><input v-model="row.stock" type="number" min="0" class="vt-input vt-num" /></td>
-                        <td><input v-model="row.sku" class="vt-input" placeholder="VN-LP-RAM16" /></td>
-                        <td>
-                          <button class="vt-remove" @click="removeVariantRow(ri)" title="Xóa dòng">
-                            <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="12" height="12">
-                              <line x1="2" y1="2" x2="12" y2="12"/><line x1="12" y1="2" x2="2" y2="12"/>
+                        <td class="td-act">
+                          <button class="ra-del" title="Xóa" @click="removeRow(ri)">
+                            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2"
+                              stroke-linecap="round" width="10" height="10">
+                              <line x1="1" y1="1" x2="11" y2="11" />
+                              <line x1="11" y1="1" x2="1" y2="11" />
                             </svg>
                           </button>
                         </td>
@@ -647,91 +1087,20 @@ const submitColor = () => {
                   </table>
                 </div>
 
-                <!-- PREVIEW MÀU ĐÃ CHỌN -->
-                <div v-if="variantRows.some(r => r.color)" class="color-preview-row">
-                  <span class="cp-label">Màu trong biến thể:</span>
-                  <div
-                    v-for="c in [...new Set(variantRows.filter(r=>r.color).map(r=>r.color))]"
-                    :key="c"
-                    class="cp-item"
-                  >
-                    <span class="cp-dot" :style="{ background: colorList.find(x=>x.name===c)?.hex || '#ccc' }"></span>
-                    <span>{{ c }}</span>
-                  </div>
+                <div class="p2-foot">
+                  <span class="p2-count"><b>{{ generatedRows.length }}</b> biến thể</span>
                 </div>
-
-                <div class="step3-footer">
-                  <button class="btn-add-row" @click="addVariantRow">+ Thêm dòng</button>
-                  <div class="step3-right">
-                    <span class="vt-count-badge">{{ variantRows.length }} biến thể</span>
-                    <button class="btn-confirm" @click="confirmVariants">✓ Xác nhận nhóm này</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- BẢNG TÓM TẮT TẤT CẢ BIẾN THỂ ĐÃ CẤU HÌNH -->
-              <div v-if="variantStep === 1 && configuredGroups.length" class="summary-section">
-                <div class="summary-title">
-                  <span class="vs-bar purple"></span>
-                  Tổng hợp biến thể đã cấu hình
-                </div>
-                <div v-for="(cg, ci) in configuredGroups" :key="ci" class="summary-group">
-                  <div class="summary-group-header">
-                    <span>{{ cg.groupIcon }} {{ cg.groupName }}</span>
-                    <span class="sg-count">{{ cg.rows.length }} biến thể</span>
-                  </div>
-                  <div class="summary-rows">
-                    <div v-for="(row, ri) in cg.rows" :key="ri" class="summary-row">
-                      <span class="sr-attr">{{ row.attrName }}</span>
-                      <span class="sr-type">{{ row.attrType }}</span>
-                      <div v-if="row.color" class="sr-color">
-                        <span class="sr-dot" :style="{ background: colorList.find(c=>c.name===row.color)?.hex || '#ccc' }"></span>
-                        {{ row.color }}
-                      </div>
-                      <span v-if="row.price" class="sr-price">{{ row.price }} ₫</span>
-                      <span class="sr-stock">Kho: {{ row.stock }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
+              </template>
             </div>
-            <!-- /vs-wrapper -->
 
             <p v-if="formError" class="form-error">⚠ {{ formError }}</p>
           </div>
 
           <div class="modal-footer">
             <button class="btn-cancel" @click="closeModal">Hủy</button>
-            <button class="btn-submit" @click="submitForm">Thêm sản phẩm</button>
-          </div>
-
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- MODAL THÊM MÀU (standalone) -->
-    <Teleport to="body">
-      <div v-if="showColorModal" class="modal-overlay" @click.self="closeColorModal">
-        <div class="modal modal-sm">
-          <div class="modal-header">
-            <h3>Thêm màu sắc mới</h3>
-            <button class="modal-close" @click="closeColorModal">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="form-group">
-              <label>Tên màu <span class="required">*</span></label>
-              <input v-model="colorForm.name" placeholder="VD: Midnight Green" />
-            </div>
-            <div class="form-group">
-              <label>Chọn màu</label>
-              <input v-model="colorForm.hex" type="color"
-                style="width:60px;height:36px;padding:2px;border-radius:8px;border:1px solid #e2e8f0;cursor:pointer" />
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn-cancel" @click="closeColorModal">Hủy</button>
-            <button class="btn-submit" @click="submitColor">Thêm màu</button>
+            <button class="btn-submit" @click="submitForm">
+              {{ isEditMode ? 'Lưu thay đổi' : 'Thêm sản phẩm' }}
+            </button>
           </div>
         </div>
       </div>
@@ -741,471 +1110,1507 @@ const submitColor = () => {
 </template>
 
 <style scoped>
-/* ═══════════════════ BASE ═══════════════════ */
 .admin {
   padding: 32px 48px;
   background: #f5f7fb;
   min-height: 100vh;
-  font-family: sans-serif;
+  font-family: 'Segoe UI', sans-serif;
 }
 
-/* HEADER */
-.top { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
-.top h1 { font-size:24px; font-weight:700; color:#0f172a; margin:0 0 4px; }
-.top p  { font-size:13px; color:#64748b; margin:0; }
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.top h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 4px;
+}
+
+.top p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
 
 .add-btn {
-  background: linear-gradient(135deg,#2563eb,#4f46e5);
-  color:white; border:none; padding:10px 20px;
-  border-radius:10px; font-size:13px; font-weight:600;
-  cursor:pointer; transition:opacity .2s,transform .2s;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .2s, transform .2s;
 }
-.add-btn:hover { opacity:.9; transform:translateY(-1px); }
 
-/* STATS */
-.stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.add-btn:hover {
+  opacity: .9;
+  transform: translateY(-1px);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
 .stat-card {
-  background:white; border-radius:12px; padding:18px 20px;
-  display:flex; align-items:center; gap:14px; border:1px solid #f1f5f9;
+  background: white;
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #f1f5f9;
 }
-.stat-card p { font-size:12px; color:#64748b; margin:0 0 4px; }
-.stat-card b { font-size:22px; font-weight:700; color:#0f172a; }
-.stat-icon { font-size:22px; width:44px; height:44px; border-radius:10px;
-  display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.stat-icon.blue   { background:#dbeafe; }
-.stat-icon.green  { background:#dcfce7; }
-.stat-icon.red    { background:#fee2e2; }
-.stat-icon.purple { background:#ede9fe; }
 
-/* FILTER */
-.filter-bar { display:flex; gap:10px; margin-bottom:16px; }
-.search-wrap { flex:1; position:relative; }
-.search-icon { position:absolute; left:13px; top:50%; transform:translateY(-50%);
-  width:16px; height:16px; color:#94a3b8; pointer-events:none; }
+.stat-card p {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0 0 4px;
+}
+
+.stat-card b {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.stat-icon {
+  font-size: 22px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-icon.blue {
+  background: #dbeafe
+}
+
+.stat-icon.green {
+  background: #dcfce7
+}
+
+.stat-icon.red {
+  background: #fee2e2
+}
+
+.stat-icon.purple {
+  background: #ede9fe
+}
+
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.search-wrap {
+  flex: 1;
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
 .search-wrap input {
-  width:100%; padding:10px 14px 10px 38px; border-radius:10px;
-  border:1px solid #e2e8f0; background:white; font-size:13px;
-  color:#0f172a; outline:none; transition:border-color .2s; box-sizing:border-box;
+  width: 100%;
+  padding: 10px 14px 10px 38px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition: border-color .2s;
+  box-sizing: border-box;
 }
-.search-wrap input:focus { border-color:#2563eb; }
+
+.search-wrap input:focus {
+  border-color: #2563eb;
+}
+
 .filter-bar select {
-  padding:10px 14px; border-radius:10px; border:1px solid #e2e8f0;
-  background:white; font-size:13px; color:#334155; outline:none;
-  cursor:pointer; min-width:160px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 13px;
+  color: #334155;
+  outline: none;
+  cursor: pointer;
+  min-width: 160px;
 }
-.filter-bar select:focus { border-color:#2563eb; }
 
-/* TABLE */
-.table-wrap { background:white; border-radius:14px; border:1px solid #f1f5f9; overflow:hidden; }
-table { width:100%; border-collapse:collapse; }
-thead tr { background:#f8fafc; }
-thead th { padding:13px 16px; font-size:12px; font-weight:600; color:#64748b;
-  text-align:left; letter-spacing:.04em; border-bottom:1px solid #f1f5f9; }
-tbody tr { border-bottom:1px solid #f8fafc; transition:background .15s; }
-tbody tr:last-child { border-bottom:none; }
-tbody tr:hover { background:#fafbff; }
-tbody td { padding:14px 16px; font-size:13px; color:#334155; vertical-align:middle; }
-.empty { text-align:center; color:#94a3b8; padding:40px !important; }
+.table-wrap {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #f1f5f9;
+  overflow: hidden;
+}
 
-.product-cell { display:flex; align-items:center; gap:12px; }
-.product-cell img { width:42px; height:42px; border-radius:8px; object-fit:cover; flex-shrink:0; }
-.product-cell b { display:block; font-size:13px; font-weight:600; color:#0f172a; margin-bottom:2px; }
-.product-cell span { font-size:11px; color:#94a3b8; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
-.badge { display:inline-block; font-size:11px; font-weight:500; padding:4px 10px;
-  border-radius:6px; background:#dbeafe; color:#1d4ed8; }
-.price { font-weight:600; color:#0f172a; }
+thead tr {
+  background: #f8fafc;
+}
 
-.stock-cell span { font-size:13px; font-weight:600; color:#0f172a; display:block; margin-bottom:5px; }
-.bar  { height:4px; background:#e2e8f0; border-radius:2px; width:80px; }
-.fill { height:100%; background:#2563eb; border-radius:2px; transition:width .4s; }
+thead th {
+  padding: 13px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-align: left;
+  letter-spacing: .04em;
+  border-bottom: 1px solid #f1f5f9;
+}
 
-.status-badge { display:inline-block; font-size:11px; font-weight:600;
-  padding:4px 10px; border-radius:20px; letter-spacing:.03em; }
-.status-badge.active { background:#dcfce7; color:#16a34a; }
-.status-badge.draft  { background:#f1f5f9; color:#64748b; }
+tbody tr {
+  border-bottom: 1px solid #f8fafc;
+  transition: background .15s;
+}
 
-.actions { display:flex; gap:6px; }
+tbody tr:last-child {
+  border-bottom: none;
+}
+
+tbody tr:hover {
+  background: #fafbff;
+}
+
+tbody td {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 40px !important;
+}
+
+.product-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.product-cell img {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.product-cell b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.product-cell span {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.price {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.stock-cell span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.status-badge.active {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-badge.draft {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
 .act-btn {
-  width:32px; height:32px; border-radius:8px; border:1px solid #e2e8f0;
-  background:white; cursor:pointer; display:flex; align-items:center;
-  justify-content:center; color:#64748b; transition:all .2s;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  transition: all .2s;
 }
-.act-btn svg { width:14px; height:14px; }
-.act-btn:hover { background:#f1f5f9; border-color:#cbd5e1; color:#2563eb; }
-.act-btn.danger:hover { background:#fee2e2; border-color:#fecaca; color:#ef4444; }
 
-/* PAGINATION */
-.pagination { display:flex; gap:6px; margin-top:20px; justify-content:flex-end; }
+.act-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.act-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #2563eb;
+}
+
+.act-btn.danger:hover {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #ef4444;
+}
+
+.pagination {
+  display: flex;
+  gap: 6px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
 .pagination button {
-  width:34px; height:34px; border-radius:8px; border:1px solid #e2e8f0;
-  background:white; font-size:13px; cursor:pointer; color:#334155; transition:all .2s;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 13px;
+  cursor: pointer;
+  color: #334155;
+  transition: all .2s;
 }
-.pagination button:hover { border-color:#2563eb; color:#2563eb; }
-.pagination .active { background:#2563eb; border-color:#2563eb; color:white; }
 
-/* ═══════════════════ MODAL BASE ═══════════════════ */
+.pagination button:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.pg-active {
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+  color: white !important;
+}
+
 .modal-overlay {
-  position:fixed; inset:0; background:rgba(15,23,42,.55);
-  display:flex; align-items:center; justify-content:center; z-index:1000; padding:20px;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
 }
-.modal {
-  background:white; border-radius:16px; width:100%; max-width:600px;
-  box-shadow:0 24px 60px rgba(0,0,0,.18);
-  animation:modalIn .22s cubic-bezier(.22,1,.36,1);
-  max-height:92vh; overflow-y:auto;
-}
-.modal-wide { max-width:860px; }
-.modal-sm   { max-width:420px; }
-@keyframes modalIn {
-  from { opacity:0; transform:translateY(20px) scale(.97); }
-  to   { opacity:1; transform:translateY(0) scale(1); }
-}
-.modal-header {
-  display:flex; justify-content:space-between; align-items:center;
-  padding:20px 24px 16px; border-bottom:1px solid #f1f5f9;
-  position:sticky; top:0; background:white; z-index:1;
-}
-.modal-header h3 { font-size:16px; font-weight:700; color:#0f172a; margin:0; }
-.modal-close { background:none; border:none; font-size:22px; color:#94a3b8;
-  cursor:pointer; line-height:1; padding:0; transition:color .2s; }
-.modal-close:hover { color:#0f172a; }
-.modal-body { padding:20px 24px; display:flex; flex-direction:column; gap:16px; }
 
-/* UPLOAD */
-.upload-zone {
-  border:2px dashed #cbd5e1; border-radius:10px; padding:32px 20px;
-  text-align:center; cursor:pointer; transition:border-color .2s,background .2s;
-  display:flex; flex-direction:column; align-items:center; gap:10px;
+.modal {
+  background: white;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, .22);
+  animation: modalIn .22s cubic-bezier(.22, 1, .36, 1);
+  max-height: 94vh;
+  overflow-y: auto;
 }
-.upload-zone:hover { border-color:#2563eb; background:#f0f6ff; }
-.upload-zone svg { width:40px; height:40px; color:#94a3b8; }
-.upload-zone p { font-size:14px; color:#475569; margin:0; }
-.upload-zone p span { color:#2563eb; font-weight:600; }
-.upload-zone small { font-size:12px; color:#94a3b8; }
+
+.modal-wide {
+  max-width: 960px;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(.97)
+  }
+
+  to {
+    opacity: 1;
+    transform: none
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 2;
+  border-radius: 18px 18px 0 0;
+}
+
+.modal-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #94a3b8;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.modal-close:hover {
+  color: #0f172a;
+}
+
+.modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid #f1f5f9;
+  position: sticky;
+  bottom: 0;
+  background: white;
+  z-index: 2;
+  border-radius: 0 0 18px 18px;
+}
+
+.upload-zone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 26px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-zone:hover {
+  border-color: #2563eb;
+  background: #f0f6ff;
+}
+
+.upload-zone svg {
+  width: 36px;
+  height: 36px;
+  color: #94a3b8;
+}
+
+.upload-zone p {
+  font-size: 14px;
+  color: #475569;
+  margin: 0;
+}
+
+.upload-zone p span {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.upload-zone small {
+  font-size: 12px;
+  color: #94a3b8;
+}
 
 .img-preview-wrap {
-  display:flex; align-items:center; gap:16px; background:#f8fafc;
-  border-radius:10px; padding:14px; border:1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
 }
-.img-preview { width:90px; height:90px; object-fit:cover; border-radius:8px; flex-shrink:0; }
-.img-actions { display:flex; flex-direction:column; gap:8px; }
-.img-change {
-  padding:7px 14px; border-radius:7px; border:1px solid #e2e8f0;
-  background:white; font-size:12px; font-weight:600; color:#475569;
-  cursor:pointer; transition:all .2s;
-}
-.img-change:hover { border-color:#2563eb; color:#2563eb; }
-.img-remove-btn {
-  padding:7px 14px; border-radius:7px; border:1px solid #fecaca;
-  background:#fef2f2; font-size:12px; font-weight:600; color:#ef4444;
-  cursor:pointer; transition:all .2s;
-}
-.img-remove-btn:hover { background:#fee2e2; }
 
-/* FORM */
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-.form-group { display:flex; flex-direction:column; gap:6px; }
-.form-group label { font-size:12px; font-weight:600; color:#475569; letter-spacing:.03em; }
-.required { color:#ef4444; }
+.img-preview {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.img-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.img-change {
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+}
+
+.img-change:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.img-remove-btn {
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ef4444;
+  cursor: pointer;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: .03em;
+}
+
+.required {
+  color: #ef4444;
+}
+
 .form-group input,
 .form-group select {
-  padding:10px 12px; border-radius:8px; border:1px solid #e2e8f0;
-  font-size:13px; color:#0f172a; outline:none; transition:border-color .2s; background:#fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #0f172a;
+  outline: none;
+  transition: border-color .2s;
+  background: #fff;
 }
+
 .form-group input:focus,
 .form-group select:focus {
-  border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.08);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .08);
 }
+
 .form-error {
-  font-size:12px; color:#ef4444; background:#fef2f2;
-  border:1px solid #fecaca; padding:8px 12px; border-radius:8px; margin:0;
+  font-size: 12px;
+  color: #ef4444;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 0;
 }
-.modal-footer {
-  display:flex; justify-content:flex-end; gap:10px;
-  padding:16px 24px 20px; border-top:1px solid #f1f5f9;
-  position:sticky; bottom:0; background:white;
-}
+
 .btn-cancel {
-  padding:10px 20px; border-radius:8px; border:1px solid #e2e8f0;
-  background:white; font-size:13px; font-weight:600; color:#475569;
-  cursor:pointer; transition:all .2s;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
 }
-.btn-cancel:hover { background:#f8fafc; border-color:#cbd5e1; }
+
+.btn-cancel:hover {
+  background: #f8fafc;
+}
+
 .btn-submit {
-  padding:10px 22px; border-radius:8px; border:none;
-  background:linear-gradient(135deg,#2563eb,#4f46e5);
-  color:white; font-size:13px; font-weight:600;
-  cursor:pointer; transition:opacity .2s,transform .2s;
+  padding: 10px 22px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
-.btn-submit:hover { opacity:.9; transform:translateY(-1px); }
 
-/* ═══════════════════ VARIANT SECTION ═══════════════════ */
+.btn-submit:hover {
+  opacity: .9;
+  transform: translateY(-1px);
+}
+
 .vs-wrapper {
-  border:1.5px solid #e2e8f0; border-radius:14px;
-  padding:20px; background:#fafbff;
-  display:flex; flex-direction:column; gap:16px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px 20px;
+  background: #fafbff;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
-/* header row */
-.vs-header-row { display:flex; flex-direction:column; gap:10px; }
-.vs-section-title {
-  font-size:14px; font-weight:700; color:#0f172a;
-  display:flex; align-items:center; gap:8px;
+.vs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
 }
+
+.vs-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
 .vs-bar {
-  display:inline-block; width:3px; height:17px;
-  background:linear-gradient(180deg,#2563eb,#4f46e5); border-radius:2px; flex-shrink:0;
+  display: inline-block;
+  width: 3px;
+  height: 17px;
+  background: linear-gradient(180deg, #2563eb, #4f46e5);
+  border-radius: 2px;
+  flex-shrink: 0;
 }
-.vs-bar.purple { background:linear-gradient(180deg,#7c3aed,#a855f7); }
 
-/* configured chips */
-.configured-chips { display:flex; flex-wrap:wrap; gap:8px; }
-.configured-chip {
-  display:flex; align-items:center; gap:7px;
-  padding:5px 10px 5px 12px; border-radius:20px;
-  background:#dcfce7; border:1px solid #bbf7d0;
-  font-size:12px; font-weight:600; color:#166534;
+.vs-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.chip-count {
-  background:#16a34a; color:white; border-radius:10px;
-  padding:1px 8px; font-size:11px;
-}
-.chip-remove {
-  background:none; border:none; color:#16a34a; cursor:pointer;
-  font-size:16px; line-height:1; padding:0; opacity:.7; transition:opacity .2s;
-}
-.chip-remove:hover { opacity:1; }
 
-/* STEPS BAR */
-.vs-steps { display:flex; align-items:center; }
-.vs-step { display:flex; align-items:center; gap:7px; font-size:12px; color:#94a3b8; font-weight:500; }
-.vs-step.step-active { color:#2563eb; }
-.vs-step.step-done   { color:#16a34a; }
-.step-dot {
-  width:24px; height:24px; border-radius:50%; background:#e2e8f0; color:#94a3b8;
-  font-size:11px; font-weight:700; display:flex; align-items:center;
-  justify-content:center; flex-shrink:0;
+.vss {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
 }
-.step-active .step-dot { background:#2563eb; color:white; }
-.step-done   .step-dot { background:#16a34a; color:white; }
-.step-label { white-space:nowrap; }
-.step-line { flex:1; height:2px; background:#e2e8f0; margin:0 10px; min-width:20px; }
-.step-line.line-done { background:#16a34a; }
 
-/* STEP BODIES */
-.step-body { display:flex; flex-direction:column; gap:14px; }
-.step-hint { font-size:12px; color:#64748b; margin:0; }
+.vss.active {
+  color: #2563eb;
+}
 
-.step-nav { display:flex; align-items:center; gap:12px; }
-.step-nav-title { font-size:13px; font-weight:700; color:#0f172a; }
-.back-btn {
-  padding:6px 12px; border-radius:7px; border:1px solid #e2e8f0;
-  background:white; font-size:12px; font-weight:600; color:#475569;
-  cursor:pointer; white-space:nowrap; transition:all .2s; flex-shrink:0;
+.vss.done {
+  color: #16a34a;
 }
-.back-btn:hover { border-color:#2563eb; color:#2563eb; }
 
-/* GROUP GRID */
-.group-grid { display:flex; flex-direction:column; gap:7px; }
-.group-card {
-  display:flex; align-items:center; gap:12px;
-  padding:11px 14px; border-radius:10px; border:1.5px solid #e2e8f0;
-  background:white; cursor:pointer; text-align:left; width:100%;
-  transition:all .2s;
+.vss-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: white;
 }
-.group-card:hover { border-color:#2563eb; background:#f0f6ff; }
-.group-card.group-done { border-color:#bbf7d0; background:#f0fdf4; }
-.group-icon { font-size:20px; flex-shrink:0; }
-.group-info { flex:1; display:flex; flex-direction:column; gap:2px; }
-.group-info b    { font-size:13px; color:#0f172a; font-weight:700; }
-.group-info span { font-size:11px; color:#64748b; }
-.group-arrow { color:#94a3b8; font-size:18px; }
-.group-check { font-size:11px; font-weight:700; color:#16a34a;
-  background:#dcfce7; padding:3px 10px; border-radius:20px; white-space:nowrap; }
 
-/* ATTR TYPE BLOCKS */
-.attr-type-blocks { display:flex; flex-direction:column; gap:12px; }
-.attr-type-block {
-  background:white; border:1px solid #e8edf5; border-radius:10px; padding:14px 16px;
+.vss.active .vss-dot {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
 }
-.attr-type-label {
-  font-size:11px; font-weight:700; color:#475569;
-  text-transform:uppercase; letter-spacing:.06em;
-  margin-bottom:10px; display:flex; align-items:center; gap:7px;
-}
-.type-dot {
-  display:inline-block; width:6px; height:6px; border-radius:50%; background:#2563eb;
-}
-.attr-chip-list { display:flex; flex-wrap:wrap; gap:7px; }
-.attr-chip {
-  padding:7px 14px; border-radius:20px; border:1.5px solid #e2e8f0;
-  background:white; font-size:12px; font-weight:500; color:#334155;
-  cursor:pointer; transition:all .18s; display:flex; align-items:center; gap:5px;
-}
-.attr-chip:hover { border-color:#2563eb; color:#2563eb; }
-.attr-chip.attr-chip-on {
-  background:#eff6ff; border-color:#2563eb; color:#1d4ed8; font-weight:700;
-}
-.chip-tick { display:flex; align-items:center; }
 
-/* STEP 2 FOOTER */
-.step2-footer {
-  display:flex; justify-content:space-between; align-items:center;
-  padding-top:8px; border-top:1px solid #e8edf5;
+.vss.done .vss-dot {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: white;
 }
-.selected-count { font-size:12px; color:#64748b; }
-.selected-count b { color:#2563eb; }
-.btn-next {
-  padding:9px 18px; border-radius:8px; border:none;
-  background:linear-gradient(135deg,#2563eb,#4f46e5);
-  color:white; font-size:12px; font-weight:700;
-  cursor:pointer; transition:opacity .2s;
-}
-.btn-next:disabled { opacity:.4; cursor:not-allowed; }
-.btn-next:not(:disabled):hover { opacity:.9; }
 
-/* VARIANT TABLE */
-.vt-table-wrap {
-  border:1px solid #e8edf5; border-radius:10px;
-  overflow:auto; background:white;
+.vss-line {
+  width: 24px;
+  height: 2px;
+  background: #e2e8f0;
+  border-radius: 1px;
 }
-.vt-table { width:100%; border-collapse:collapse; min-width:620px; }
-.vt-table thead tr { background:#f8fafc; }
+
+.group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: inherit;
+}
+
+.gtab:hover {
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.gtab-active {
+  border-color: #2563eb !important;
+  background: #eff6ff !important;
+  color: #1d4ed8 !important;
+}
+
+.gtab-icon {
+  font-size: 15px;
+}
+
+.gtab-name {
+  white-space: nowrap;
+}
+
+.gtab-badge {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 5px;
+  background: #2563eb;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flat-select-table {
+  background: white;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.fst-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.fst-row:last-child {
+  border-bottom: none;
+}
+
+.fst-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 72px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.fst-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: #2563eb;
+  background: #dbeafe;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.fst-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tp-blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.tp-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tp-amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.tp-pink {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.tp-purple {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.tp-teal {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.tp-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.type-pill-sm {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.type-pill-sm.tp-blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.type-pill-sm.tp-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.type-pill-sm.tp-amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.type-pill-sm.tp-pink {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.type-pill-sm.tp-purple {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.type-pill-sm.tp-teal {
+  background: #ccfbf1;
+  color: #0f766e;
+}
+
+.vbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.vbtn-blue:hover {
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.vbtn-green:hover {
+  border-color: #86efac;
+  color: #166534;
+}
+
+.vbtn-amber:hover {
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.vbtn-pink:hover {
+  border-color: #f9a8d4;
+  color: #be185d;
+}
+
+.vbtn-purple:hover {
+  border-color: #d8b4fe;
+  color: #6b21a8;
+}
+
+.vbtn-teal:hover {
+  border-color: #5eead4;
+  color: #0f766e;
+}
+
+.vbtn-red:hover {
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+.vbtn-blue.vbtn-on {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-green.vbtn-on {
+  border-color: #16a34a;
+  background: #16a34a;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-amber.vbtn-on {
+  border-color: #d97706;
+  background: #d97706;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-pink.vbtn-on {
+  border-color: #db2777;
+  background: #db2777;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-purple.vbtn-on {
+  border-color: #7c3aed;
+  background: #7c3aed;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-teal.vbtn-on {
+  border-color: #0d9488;
+  background: #0d9488;
+  color: white;
+  font-weight: 600;
+}
+
+.vbtn-red.vbtn-on {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: white;
+  font-weight: 600;
+}
+
+.color-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  flex-shrink: 0;
+}
+
+.group-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  color: #94a3b8;
+  font-size: 12px;
+  background: white;
+  border: 1.5px dashed #e2e8f0;
+  border-radius: 10px;
+}
+
+.p1-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 16px;
+  background: white;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+}
+
+.combo-formula {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cf-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cf-item b {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.cf-x {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.cf-eq {
+  font-size: 12px;
+  color: #64748b;
+  padding-left: 4px;
+}
+
+.cf-eq b {
+  font-size: 13px;
+  color: #2563eb;
+}
+
+.p1-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.p1-hint {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.btn-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, .28);
+  transition: opacity .2s, transform .2s;
+  font-family: inherit;
+}
+
+.btn-generate:hover {
+  opacity: .9;
+  transform: translateY(-1px);
+}
+
+.btn-generate:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.p2-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+
+.btn-back:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 7px 11px;
+  background: #f8fafc;
+  border-radius: 9px;
+  border: 1px solid #f1f5f9;
+}
+
+.bulk-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.bulk-in {
+  padding: 6px 9px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #0f172a;
+  outline: none;
+  background: white;
+  transition: border-color .2s;
+  width: 108px;
+  font-family: inherit;
+}
+
+.bulk-in:focus {
+  border-color: #2563eb;
+}
+
+.bulk-num {
+  width: 68px;
+  text-align: right;
+}
+
+.btn-apply {
+  padding: 6px 13px;
+  border-radius: 7px;
+  border: none;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.btn-apply:hover {
+  opacity: .88;
+}
+
+.p2-info {
+  font-size: 12px;
+  color: #92400e;
+  padding: 8px 13px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+}
+
+.p2-info b {
+  color: #92400e;
+}
+
+.vt-scroll {
+  overflow-x: auto;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+  background: white;
+}
+
+.vt-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.vt-table thead tr {
+  background: #f8fafc;
+}
+
 .vt-table thead th {
-  padding:10px 12px; font-size:10px; font-weight:700; color:#94a3b8;
-  text-align:left; letter-spacing:.06em; border-bottom:1px solid #f1f5f9; white-space:nowrap;
+  padding: 9px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-align: left;
+  letter-spacing: .06em;
+  border-bottom: 1px solid #f1f5f9;
+  white-space: nowrap;
 }
-.vt-table tbody tr { border-bottom:1px solid #f8fafc; transition:background .15s; }
-.vt-table tbody tr:last-child { border-bottom:none; }
-.vt-table tbody tr:hover { background:#fafbff; }
-.vt-table tbody td { padding:9px 12px; vertical-align:middle; }
+
+.th-no {
+  width: 38px;
+  text-align: center;
+}
+
+.th-price {
+  min-width: 138px;
+}
+
+.th-stock {
+  width: 76px;
+}
+
+.th-act {
+  width: 44px;
+  text-align: center;
+}
+
+.vt-row {
+  border-bottom: 1px solid #f8fafc;
+  transition: background .12s;
+}
+
+.vbtn-red.vbtn-on {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: white;
+  font-weight: 600;
+}
+
+/* Placeholder */
+.group-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  color: #94a3b8;
+  font-size: 12px;
+  background: white;
+  border: 1.5px dashed #e2e8f0;
+  border-radius: 10px;
+}
+
+/* ── PHASE 1 FOOTER ── */
+.p1-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 16px;
+  background: white;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+}
+
+.combo-bar {}
+
+.combo-formula {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.td-act {
+  text-align: center;
+}
+
+.row-no {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.val-chip {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 5px;
+  white-space: nowrap;
+  border: 1px solid;
+}
+
+.vc-blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.vc-green {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.vc-amber {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.vc-pink {
+  background: #fdf2f8;
+  border-color: #f9a8d4;
+  color: #be185d;
+}
+
+.vc-purple {
+  background: #faf5ff;
+  border-color: #e9d5ff;
+  color: #6b21a8;
+}
+
+.vc-teal {
+  background: #f0fdfa;
+  border-color: #99f6e4;
+  color: #0f766e;
+}
+
+.vc-red {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
 
 .vt-input {
-  padding:7px 10px; border-radius:7px; border:1px solid #e2e8f0;
-  font-size:12px; color:#0f172a; outline:none; background:#fafbff;
-  transition:border-color .2s; width:100%; box-sizing:border-box;
-}
-.vt-input:focus { border-color:#2563eb; }
-.vt-num { width:72px !important; }
-
-.vt-select {
-  padding:7px 10px; border-radius:7px; border:1px solid #e2e8f0;
-  font-size:12px; color:#0f172a; outline:none; background:#fafbff;
-  cursor:pointer; min-width:120px; transition:border-color .2s;
-}
-.vt-select:focus { border-color:#2563eb; }
-
-.color-select-wrap { display:flex; align-items:center; gap:7px; }
-.color-dot-sm {
-  width:14px; height:14px; border-radius:50%; flex-shrink:0;
-  border:1.5px solid rgba(0,0,0,.1);
-}
-.vt-attr-tag {
-  font-size:12px; font-weight:700; color:#1d4ed8;
-  background:#eff6ff; padding:4px 10px; border-radius:6px; display:inline-block;
-}
-.vt-type-badge {
-  font-size:11px; font-weight:600; padding:3px 9px; border-radius:5px;
-  background:#f3e8ff; color:#7c3aed; white-space:nowrap;
-}
-.vt-dim { color:#cbd5e1; }
-.vt-remove {
-  width:26px; height:26px; border-radius:6px; border:1px solid #fecaca;
-  background:#fef2f2; color:#ef4444; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; transition:all .2s;
-}
-.vt-remove:hover { background:#fee2e2; }
-
-/* COLOR PREVIEW */
-.color-preview-row {
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  padding:10px 14px; background:white; border:1px solid #e8edf5;
-  border-radius:8px;
-}
-.cp-label { font-size:11px; font-weight:600; color:#64748b; }
-.cp-item { display:flex; align-items:center; gap:5px; font-size:12px; color:#0f172a; }
-.cp-dot {
-  width:14px; height:14px; border-radius:50%; flex-shrink:0;
-  border:1.5px solid rgba(0,0,0,.1);
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #0f172a;
+  outline: none;
+  background: #fafbff;
+  transition: border-color .2s;
+  box-sizing: border-box;
+  font-family: inherit;
 }
 
-/* STEP 3 FOOTER */
-.step3-footer {
-  display:flex; justify-content:space-between; align-items:center;
-  padding-top:10px; border-top:1px solid #e8edf5; flex-wrap:wrap; gap:10px;
+.cf-eq b {
+  font-size: 13px;
+  color: #2563eb;
 }
-.btn-add-row {
-  padding:8px 14px; border-radius:8px; border:1.5px dashed #22c55e;
-  background:white; font-size:12px; font-weight:600; color:#16a34a;
-  cursor:pointer; transition:all .2s;
-}
-.btn-add-row:hover { background:#f0fdf4; }
-.step3-right { display:flex; align-items:center; gap:10px; }
-.vt-count-badge {
-  font-size:12px; font-weight:600; padding:4px 12px; border-radius:20px;
-  background:#eff6ff; color:#2563eb;
-}
-.btn-confirm {
-  padding:9px 18px; border-radius:8px; border:none;
-  background:linear-gradient(135deg,#16a34a,#15803d);
-  color:white; font-size:12px; font-weight:700;
-  cursor:pointer; transition:opacity .2s;
-}
-.btn-confirm:hover { opacity:.9; }
 
-/* SUMMARY SECTION */
-.summary-section {
-  border:1px solid #e8edf5; border-radius:10px;
-  background:white; overflow:hidden;
+.vt-num {
+  width: 50px;
+  text-align: right;
 }
-.summary-title {
-  font-size:13px; font-weight:700; color:#0f172a;
-  display:flex; align-items:center; gap:8px;
-  padding:12px 16px; border-bottom:1px solid #f1f5f9; background:#fafbff;
-}
-.summary-group { border-bottom:1px solid #f1f5f9; }
-.summary-group:last-child { border-bottom:none; }
-.summary-group-header {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:10px 16px; background:#f8fafc;
-  font-size:13px; font-weight:700; color:#0f172a;
-}
-.sg-count {
-  font-size:11px; font-weight:600; padding:3px 10px; border-radius:20px;
-  background:#dbeafe; color:#1d4ed8;
-}
-.summary-rows { display:flex; flex-direction:column; gap:0; }
-.summary-row {
-  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  padding:8px 16px; border-bottom:1px solid #f8fafc; font-size:12px;
-}
-.summary-row:last-child { border-bottom:none; }
-.sr-attr {
-  font-weight:700; color:#0f172a; background:#eff6ff;
-  padding:2px 9px; border-radius:5px; font-size:11px;
-}
-.sr-type {
-  padding:2px 9px; border-radius:5px;
-  background:#f3e8ff; color:#7c3aed; font-size:11px; font-weight:600;
-}
-.sr-color { display:flex; align-items:center; gap:5px; font-size:12px; color:#334155; }
-.sr-dot {
-  width:12px; height:12px; border-radius:50%; flex-shrink:0;
-  border:1.5px solid rgba(0,0,0,.1);
-}
-.sr-price { color:#16a34a; font-weight:600; }
-.sr-stock { color:#64748b; }
 
-/* ═══════════════════ RESPONSIVE ═══════════════════ */
-@media (max-width:768px) {
-  .admin { padding:20px 16px; }
-  .stats { grid-template-columns:repeat(2,1fr); }
-  .filter-bar { flex-wrap:wrap; }
-  .table-wrap { overflow-x:auto; }
-  table { min-width:700px; }
-  .form-row { grid-template-columns:1fr; }
-  .modal-wide { max-width:98vw; }
-  .step-label { display:none; }
+.ra-del {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  transition: all .2s;
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 7px 11px;
+  background: #f8fafc;
+  border-radius: 9px;
+  border: 1px solid #f1f5f9;
+}
+
+.p2-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.p2-count {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.p2-count b {
+  color: #0f172a;
+}
+
+.multi-preview-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.multi-preview-item {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.multi-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.multi-preview-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.75);
+  color: white;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.pg-dots {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
+}
+
+@media (max-width: 768px) {
+  .admin {
+    padding: 20px 16px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 700px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-wide {
+    max-width: 98vw;
+  }
+
+  .vs-steps {
+    display: none;
+  }
+
+  .p2-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fst-row {
+    flex-direction: column;
+    gap: 8px;
+  }
 }
 </style>

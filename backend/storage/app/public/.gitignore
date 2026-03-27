@@ -1,2 +1,7 @@
 *
 !.gitignore
+!uploads/
+!uploads/sanpham/
+!uploads/sanpham/**
+!uploads/avatar/
+!uploads/avatar/**
