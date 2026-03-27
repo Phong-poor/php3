@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ThuongHieuModel;
+use App\Models\ThuongHieu;
 use Illuminate\Http\Request;
 
 class ThuongHieuController extends Controller
 {
     
     public function index(){
-        $thuonghieu = ThuongHieuModel::all();
+        $thuonghieu = ThuongHieu::all();
         return response()->json(['thongbao' => 'thành công', 'data' => $thuonghieu]);
     }
     public function store(Request $request){
@@ -18,7 +18,7 @@ class ThuongHieuController extends Controller
             
         ]);
 
-        $danhmuc = ThuongHieuModel::create($validated);
+        $danhmuc = ThuongHieu::create($validated);
         return response()->json([
             'thongbao' => 'thành công',
             'message' => 'Thêm danh mục thành công',
@@ -27,7 +27,7 @@ class ThuongHieuController extends Controller
     }
     public function show($id)
     {
-        $thuonghieu = ThuongHieuModel::find($id);
+        $thuonghieu = ThuongHieu::find($id);
 
         if (!$thuonghieu) {
             return response()->json(['message' => 'Không tìm thấy danh mục'], 404);
@@ -37,7 +37,7 @@ class ThuongHieuController extends Controller
     }
     public function update(Request $request, $id)
     {
-        $thuonghieu = ThuongHieuModel::find($id);
+        $thuonghieu = ThuongHieu::find($id);
 
         if (!$thuonghieu) {
             return response()->json(['message' => 'Không tìm thấy danh mục để sửa'], 404);
@@ -59,7 +59,7 @@ class ThuongHieuController extends Controller
         }
         public function destroy($id)
     {
-        $thuonghieu = ThuongHieuModel::find($id);
+        $thuonghieu = ThuongHieu::find($id);
 
         if (!$thuonghieu) {
             return response()->json(['message' => 'Không tìm thấy danh mục để xóa'], 404);
