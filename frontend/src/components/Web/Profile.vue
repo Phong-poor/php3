@@ -103,8 +103,52 @@ const res = await axios.get('http://127.0.0.1:8000/api/user/profile', {
   }
 }
 
+const fetchOrders = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    const res = await axios.get('http://127.0.0.1:8000/api/orders', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (res.data.success) {
+      orders.value = res.data.orders.map(order => {
+        // Map backend state to frontend keys
+        let statusKey = 'pending'
+        if (order.trangthai === 'confirmed') statusKey = 'confirmed'
+        if (order.trangthai === 'shipping') statusKey = 'shipping'
+        if (order.trangthai === 'done' || order.trangthai === 'completed') statusKey = 'done'
+        if (order.trangthai === 'cancelled') statusKey = 'cancelled'
+
+        return {
+          id: `NGL-2026-${String(order.id_dathang).padStart(3, '0')}`,
+          date: new Date(order.created_at).toLocaleDateString('vi-VN'),
+          status: statusKey,
+          total: new Intl.NumberFormat('vi-VN').format(order.tongtien) + 'đ',
+          items: order.chi_tiets.map(item => ({
+            name: item.bien_the?.san_pham?.tenSP || 'Sản phẩm',
+            qty: item.soluong,
+            price: new Intl.NumberFormat('vi-VN').format(item.gia) + 'đ',
+            img: item.bien_the?.san_pham?.hinhanh ? `http://127.0.0.1:8000/storage/${item.bien_the.san_pham.hinhanh}` : 'https://via.placeholder.com/200'
+          })),
+          steps: [
+            { label: 'Đặt hàng', date: new Date(order.created_at).toLocaleString('vi-VN'), done: true },
+            { label: 'Xác nhận', date: null, done: statusKey !== 'pending' },
+            { label: 'Đang giao', date: null, done: statusKey === 'shipping' || statusKey === 'done' },
+            { label: 'Hoàn thành', date: null, done: statusKey === 'done' },
+          ]
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Lỗi tải đơn hàng:', error)
+  }
+}
+
 onMounted(() => {
   loadUser()
+  fetchOrders()
 })
 
 const startEdit = () => {
@@ -159,11 +203,11 @@ const saveProfile = async () => {
   }
 }
 
-const stats = [
-  { label: 'Đơn hàng', value: '12', icon: 'orders' },
+const stats = computed(() => [
+  { label: 'Đơn hàng', value: orders.value.length.toString(), icon: 'orders' },
   { label: 'Yêu thích', value: '8', icon: 'heart' },
   { label: 'Điểm thưởng', value: '1.250', icon: 'star' },
-]
+])
 
 // ════════════════════════════════════════════════
 //  TAB 2 — ORDERS
@@ -174,6 +218,7 @@ const selectedOrder = ref(null)
 const orderTabs = [
   { key: 'all', label: 'Tất cả' },
   { key: 'pending', label: 'Chờ xác nhận' },
+  { key: 'confirmed', label: 'Đã xác nhận' },
   { key: 'shipping', label: 'Đang giao' },
   { key: 'done', label: 'Hoàn thành' },
   { key: 'cancelled', label: 'Đã hủy' },
@@ -181,94 +226,13 @@ const orderTabs = [
 
 const statusMap = {
   pending: { label: 'Chờ xác nhận', color: '#f59e0b', bg: '#fef3c7' },
+  confirmed: { label: 'Đã xác nhận', color: '#0369a1', bg: '#e0f2fe' },
   shipping: { label: 'Đang giao', color: '#2563eb', bg: '#dbeafe' },
   done: { label: 'Hoàn thành', color: '#16a34a', bg: '#dcfce7' },
   cancelled: { label: 'Đã hủy', color: '#dc2626', bg: '#fee2e2' },
 }
 
-const orders = ref([
-  {
-    id: 'NGL-2026-001',
-    date: '18/03/2026',
-    status: 'done',
-    total: '36.990.000đ',
-    items: [
-      {
-        name: 'VinaBook Pro X14',
-        qty: 1,
-        price: '36.990.000đ',
-        img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200',
-      },
-    ],
-    steps: [
-      { label: 'Đặt hàng', date: '15/03/2026 09:12', done: true },
-      { label: 'Xác nhận', date: '15/03/2026 10:30', done: true },
-      { label: 'Đang đóng gói', date: '16/03/2026 08:00', done: true },
-      { label: 'Đang giao', date: '17/03/2026 14:20', done: true },
-      { label: 'Hoàn thành', date: '18/03/2026 11:05', done: true },
-    ],
-  },
-  {
-    id: 'NGL-2026-002',
-    date: '20/03/2026',
-    status: 'shipping',
-    total: '62.990.000đ',
-    items: [
-      {
-        name: 'Zephyrus Titan 16',
-        qty: 1,
-        price: '62.990.000đ',
-        img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200',
-      },
-    ],
-    steps: [
-      { label: 'Đặt hàng', date: '20/03/2026 14:00', done: true },
-      { label: 'Xác nhận', date: '20/03/2026 15:10', done: true },
-      { label: 'Đang đóng gói', date: '21/03/2026 09:00', done: true },
-      { label: 'Đang giao', date: '22/03/2026 08:30', done: true },
-      { label: 'Hoàn thành', date: null, done: false },
-    ],
-  },
-  {
-    id: 'NGL-2026-003',
-    date: '22/03/2026',
-    status: 'pending',
-    total: '48.490.000đ',
-    items: [
-      {
-        name: 'Creator Studio 15',
-        qty: 1,
-        price: '48.490.000đ',
-        img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=200',
-      },
-    ],
-    steps: [
-      { label: 'Đặt hàng', date: '22/03/2026 20:05', done: true },
-      { label: 'Xác nhận', date: null, done: false },
-      { label: 'Đang đóng gói', date: null, done: false },
-      { label: 'Đang giao', date: null, done: false },
-      { label: 'Hoàn thành', date: null, done: false },
-    ],
-  },
-  {
-    id: 'NGL-2025-089',
-    date: '10/12/2025',
-    status: 'cancelled',
-    total: '29.990.000đ',
-    items: [
-      {
-        name: 'SlimBook Air 13',
-        qty: 1,
-        price: '29.990.000đ',
-        img: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=200',
-      },
-    ],
-    steps: [
-      { label: 'Đặt hàng', date: '10/12/2025 11:00', done: true },
-      { label: 'Đã hủy', date: '10/12/2025 11:45', done: true },
-    ],
-  },
-])
+const orders = ref([])
 
 const filteredOrders = computed(() =>
   orderTab.value === 'all'

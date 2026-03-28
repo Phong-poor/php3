@@ -1,70 +1,86 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import api from '../../services/api'
 
 const activeTab = ref('Tất cả')
 const searchQuery = ref('')
 const showModal = ref(false)
 const formError = ref('')
 
-const tabs = ['Tất cả', 'Chờ xác nhận', 'Đang giao', 'Hoàn thành', 'Đã hủy']
+const tabs = ['Tất cả', 'Chờ xác nhận', 'Đã xác nhận', 'Đang giao', 'Hoàn thành', 'Đã hủy']
 
-const statusStyle = {
-    'Đang giao':     { bg: '#dbeafe', color: '#2563eb' },
-    'Chờ xác nhận':  { bg: '#fef9c3', color: '#ca8a04' },
-    'Hoàn thành':    { bg: '#dcfce7', color: '#16a34a' },
-    'Đã hủy':        { bg: '#fee2e2', color: '#dc2626' },
+const statusMap = {
+    'pending':   { label: 'Chờ xác nhận', bg: '#fef9c3', color: '#ca8a04' },
+    'confirmed': { label: 'Đã xác nhận', bg: '#e0f2fe', color: '#0369a1' },
+    'shipping':  { label: 'Đang giao', bg: '#dbeafe', color: '#2563eb' },
+    'done':      { label: 'Hoàn thành', bg: '#dcfce7', color: '#16a34a' },
+    'cancelled': { label: 'Đã hủy', bg: '#fee2e2', color: '#dc2626' },
 }
 
-const orders = ref([
-    {
-        id: '#VT-2026-001',
-        name: 'Nguyễn Anh Minh',
-        email: 'minh.na@vinatech.com',
-        avatar: 'NA',
-        date: '12/10/2026',
-        total: '45.990.000đ',
-        status: 'Đang giao',
-        phone: '0901234567',
-        address: '12 Nguyễn Huệ, Q.1, TP.HCM',
-        note: '',
-    },
-    {
-        id: '#VT-2026-002',
-        name: 'Trần Thị Thu Hà',
-        email: 'ha.tt@gmail.com',
-        avatar: 'TH',
-        date: '11/10/2026',
-        total: '12.500.000đ',
-        status: 'Chờ xác nhận',
-        phone: '0912345678',
-        address: '45 Lê Lợi, Q.3, TP.HCM',
-        note: '',
-    },
-    {
-        id: '#VT-2026-003',
-        name: 'Lê Hoàng Nam',
-        email: 'nam.lh@outlook.com',
-        avatar: 'LN',
-        date: '10/10/2026',
-        total: '89.000.000đ',
-        status: 'Hoàn thành',
-        phone: '0923456789',
-        address: '88 Trần Hưng Đạo, Q.5, TP.HCM',
-        note: '',
-    },
-    {
-        id: '#VT-2026-004',
-        name: 'Phạm Thanh Tùng',
-        email: 'tung.pt@gmail.com',
-        avatar: 'PT',
-        date: '09/10/2026',
-        total: '5.200.000đ',
-        status: 'Đã hủy',
-        phone: '0934567890',
-        address: '22 Đinh Tiên Hoàng, Q.Bình Thạnh, TP.HCM',
-        note: 'Khách hủy do thay đổi địa chỉ',
-    },
-])
+const getStatusLabel = (s) => statusMap[s]?.label || s
+const getStatusStyle = (s) => ({ background: statusMap[s]?.bg, color: statusMap[s]?.color })
+
+const orders = ref([])
+const isLoading = ref(false)
+
+const fetchOrders = async () => {
+    try {
+        isLoading.value = true
+        const res = await api.get('/admin/orders')
+        if (res.data.success) {
+            orders.value = res.data.orders.map(o => ({
+                id_backend: o.id_dathang,
+                id: `#VT-2026-${String(o.id_dathang).padStart(3, '0')}`,
+                name: o.user?.name || 'Ẩn danh',
+                email: o.user?.email || '',
+                avatar: (o.user?.name || 'NA').split(' ').map(w => w[0]).slice(-2).join('').toUpperCase(),
+                date: new Date(o.created_at).toLocaleDateString('vi-VN'),
+                total: new Intl.NumberFormat('vi-VN').format(o.tongtien) + 'đ',
+                status: o.trangthai,
+                phone: o.user?.phone || '',
+                address: o.diachi || '',
+                note: '', // Có thể thêm cột này sau
+            }))
+        }
+    } catch (error) {
+        console.error('Lỗi tải đơn hàng:', error)
+    } finally {
+        isLoading.value = false
+    }
+}
+
+const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+        const res = await api.put(`/admin/orders/${orderId}/status`, { trangthai: newStatus })
+        if (res.data.success) {
+            const idx = orders.value.findIndex(o => o.id_backend === orderId)
+            if (idx !== -1) orders.value[idx].status = newStatus
+            alert('Cập nhật trạng thái thành công!')
+        }
+    } catch (error) {
+        alert('Lỗi: ' + (error.response?.data?.message || 'Không thể cập nhật'))
+    }
+}
+
+onMounted(() => {
+    fetchOrders()
+})
+
+const todayRevenue = computed(() => {
+    const today = new Date().toLocaleDateString('vi-VN')
+    return orders.value
+        .filter(o => o.date === today && o.status === 'done')
+        .reduce((sum, o) => {
+            const price = parseInt(o.total.replace(/[^0-9]/g, ''))
+            return sum + price
+        }, 0)
+})
+
+const formatRevenue = (val) => {
+    if (val >= 1000000000) return '+' + (val / 1000000000).toFixed(1) + 'B'
+    if (val >= 1000000) return '+' + (val / 1000000).toFixed(1) + 'M'
+    return '+' + val.toLocaleString('vi-VN')
+}
 
 const filteredOrders = computed(() => {
     return orders.value.filter(o => {
@@ -231,10 +247,16 @@ const getAvatarStyle = (name) => {
                         <td><b class="total">{{ o.total }}</b></td>
 
                         <td>
-                            <span class="status-pill"
-                                :style="{ background: statusStyle[o.status]?.bg, color: statusStyle[o.status]?.color }">
-                                {{ o.status }}
-                            </span>
+                            <select 
+                                :value="o.status" 
+                                @change="updateOrderStatus(o.id_backend, $event.target.value)"
+                                class="status-select"
+                                :style="getStatusStyle(o.status)"
+                            >
+                                <option v-for="(val, key) in statusMap" :key="key" :value="key">
+                                    {{ val.label }}
+                                </option>
+                            </select>
                         </td>
 
                         <td>
@@ -286,7 +308,7 @@ const getAvatarStyle = (name) => {
                 </svg>
                 <div>
                     <span>DOANH THU HÔM NAY</span>
-                    <b>+152.4M</b>
+                    <b>{{ formatRevenue(todayRevenue) }}</b>
                 </div>
             </div>
         </div>
@@ -484,9 +506,18 @@ tbody td { padding: 18px 20px; font-size: 13px; color: #334155; vertical-align: 
 .date-cell { color: #64748b; }
 .total { font-size: 14px; font-weight: 700; color: #0f172a; }
 
-.status-pill {
+.status-pill, .status-select {
     display: inline-block; font-size: 11px; font-weight: 600;
     padding: 5px 11px; border-radius: 20px; letter-spacing: 0.02em;
+    border: none; outline: none; cursor: pointer;
+}
+.status-select {
+    appearance: none;
+    padding-right: 24px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
 }
 
 .actions { display: flex; gap: 6px; }
