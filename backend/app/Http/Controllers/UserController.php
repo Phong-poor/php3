@@ -6,10 +6,12 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Carbon\Carbon;
+
 
 class UserController extends Controller
 {
-    
+
     public function index()
     {
         $users = User::select('id', 'name', 'email', 'phone', 'role', 'status', 'created_at')
@@ -19,7 +21,7 @@ class UserController extends Controller
         return response()->json($users);
     }
 
-    
+
     public function show($id)
     {
         $user = User::select('id', 'name', 'email', 'phone', 'role', 'status', 'created_at')
@@ -28,7 +30,7 @@ class UserController extends Controller
         return response()->json($user);
     }
 
-    
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -54,7 +56,7 @@ class UserController extends Controller
         ], 201);
     }
 
-    
+
     public function update(Request $request, $id)
     {
         $user = User::findOrFail($id);
@@ -85,6 +87,52 @@ class UserController extends Controller
         ]);
     }
 
+    public function updateProfile(Request $request)
+{
+    $user = $request->user();
+
+    if (!$user) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
+    }
+
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email,' . $user->id,
+        'phone' => 'nullable|string|max:20',
+        'birthday' => 'nullable|date',
+        'gender' => 'nullable|in:male,female',
+    ]);
+
+    // FIX DATE
+    $date = isset($validated['birthday']) 
+        ? Carbon::parse($validated['birthday'])->format('Y-m-d') 
+        : null;
+
+    // FIX GENDER (nếu DB tiếng Việt)
+    $genderMap = [
+        'male' => 'Nam',
+        'female' => 'Nữ',
+    ];
+
+    $user->name = $validated['name'];
+    $user->email = $validated['email'];
+    $user->phone = $validated['phone'] ?? null;
+    $user->date_of_birth = $date;
+    $user->gender = isset($validated['gender']) ? $genderMap[$validated['gender']] : null;
+
+    $user->save();
+
+    return response()->json([
+        'message' => 'Cập nhật thành công',
+        'user' => $user
+    ]);
+}
+
+     public function profile(Request $request)
+    {
+        return response()->json($request->user());
+    }
+
     /**
      * DELETE /api/users/{id}
      * Xóa user
@@ -96,4 +144,6 @@ class UserController extends Controller
 
         return response()->json(['message' => 'Xóa người dùng thành công']);
     }
+
+   
 }

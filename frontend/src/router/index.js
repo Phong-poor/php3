@@ -16,8 +16,9 @@ import Chatbot from '../components/Web/Chatbot.vue'
 import Orderspage from '../components/Web/Orderspage.vue'
 import Addresspage from '../components/Web/Addresspage.vue'
 import Passwordpage from '../components/Web/Passwordpage.vue'
+import LoginSuccess from '../components/Web/LoginSuccess.vue'
 
-// ── Auth  ──
+// ── Auth ──
 import Login from '../components/Auth/Login.vue'
 import Register from '../components/Auth/Register.vue'
 import ForgotPassword from '../components/Auth/ForgotPassword.vue'
@@ -27,10 +28,8 @@ import ResetPassword from '../components/Auth/ResetPassword.vue'
 // ── Admin ──
 import AdminLayout from '../components/Admin/Layout/AdminLayout.vue'
 import AdminDashboard from '../components/Admin/Dashboard.vue'
-import { computed } from 'vue'
 
 const routes = [
-
   // ── WEB ──
   {
     path: '/',
@@ -58,10 +57,15 @@ const routes = [
   { path: '/otp-verify', component: OtpVerify },
   { path: '/reset-password', component: ResetPassword },
 
+  { path: '/login-success', component: LoginSuccess },
+
+
+
   // ── ADMIN ──
   {
     path: '/admin',
     component: AdminLayout,
+    meta: { requiresAdmin: true },
     children: [
       { path: '', component: AdminDashboard },
       { path: 'products', component: () => import('../components/Admin/Products.vue') },
@@ -77,8 +81,6 @@ const routes = [
     ],
   },
 
-
-
   // ── 404 fallback ──
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
@@ -86,6 +88,49 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+router.beforeEach((to, from, next) => {
+  const user = JSON.parse(localStorage.getItem('user'))
+  const token = localStorage.getItem('token')
+
+  // route public (KHÔNG cần login)
+  const publicPages = [
+    '/',
+    '/products',
+    '/products/',
+    '/login',
+    '/register'
+  ]
+
+  const isPublic = publicPages.some(path => to.path.startsWith(path))
+
+  if (!isPublic && !token) {
+    return next('/login')
+  }
+
+  if (to.matched.some(route => route.meta.requiresAdmin)) {
+    if (!user) return next('/login')
+    if (user.role !== 'admin') return next('/')
+  }
+
+  next()
+})
+
+router.beforeEach((to, from, next) => {
+  const user = JSON.parse(localStorage.getItem('user'))
+
+  if (to.matched.some(route => route.meta.requiresAdmin)) {
+    if (!user) {
+      return next('/login')
+    }
+
+    if (user.role !== 'admin') {
+      return next('/')
+    }
+  }
+
+  next()
 })
 
 export default router

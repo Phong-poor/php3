@@ -6,7 +6,7 @@ import axios from 'axios'
 const router = useRouter()
 
 const showWishlist = ref(false)
-const showUser     = ref(false)
+const showUser = ref(false)
 
 const toggleWishlist = () => {
   showWishlist.value = !showWishlist.value
@@ -14,34 +14,52 @@ const toggleWishlist = () => {
 }
 
 const toggleUser = () => {
+  const token = localStorage.getItem('token')
+
+  // chưa login → chuyển login
+  if (!token) {
+    router.push('/login')
+    return
+  }
+
+  // ✅ đã login → mở dropdown
   showUser.value = !showUser.value
   if (showUser.value) showWishlist.value = false
+}
+
+const goAdmin = () => {
+  showUser.value = false
+  router.push('/admin')
 }
 
 const handleOutside = (e) => {
   if (!e.target.closest('.dropdown-wrap')) {
     showWishlist.value = false
-    showUser.value     = false
+    showUser.value = false
   }
 }
-onMounted(()  => document.addEventListener('click', handleOutside))
+onMounted(() => document.addEventListener('click', handleOutside))
 onUnmounted(() => document.removeEventListener('click', handleOutside))
 
 const wishlistItems = ref([
-  { id: 1, name: 'VinaBook Pro X14',   price: '36.990.000đ', img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200' },
-  { id: 2, name: 'Zephyrus Titan 16',  price: '62.990.000đ', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200' },
-  { id: 3, name: 'Creator Studio 15',  price: '48.490.000đ', img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=200' },
+  { id: 1, name: 'VinaBook Pro X14', price: '36.990.000đ', img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200' },
+  { id: 2, name: 'Zephyrus Titan 16', price: '62.990.000đ', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200' },
+  { id: 3, name: 'Creator Studio 15', price: '48.490.000đ', img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=200' },
 ])
 
 const removeWishlist = (id) => {
   wishlistItems.value = wishlistItems.value.filter(i => i.id !== id)
 }
 
-const user = ref({
-  name: 'Nguyễn Văn A',
-  email: 'nguyenvana@email.com',
-  avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-  memberSince: 'Elite 2026'
+const user = ref(null)
+
+onMounted(() => {
+  try {
+    const storedUser = localStorage.getItem('user')
+    user.value = storedUser ? JSON.parse(storedUser) : null
+  } catch {
+    user.value = null
+  }
 })
 
 const handleLogout = async () => {
@@ -52,6 +70,7 @@ const handleLogout = async () => {
     console.log('Logout API lỗi (bỏ qua)')
   }
   localStorage.removeItem('user')
+  localStorage.removeItem('token')
   localStorage.removeItem('remember_email')
   router.push('/login')
 }
@@ -67,16 +86,17 @@ const handleLogout = async () => {
       <div class="topbar-right">
         <span class="topbar-item">
           <svg viewBox="0 0 24 24" fill="none">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.08 6.08l.95-.95a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+            <path
+              d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.08 6.08l.95-.95a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
           </svg>
           1800 9999
         </span>
         <span class="topbar-divider">|</span>
         <span class="topbar-item">
           <svg viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 2a14.5 14.5 0 0 1 0 20A14.5 14.5 0 0 1 12 2"/>
-            <path d="M2 12h20"/>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 2a14.5 14.5 0 0 1 0 20A14.5 14.5 0 0 1 12 2" />
+            <path d="M2 12h20" />
           </svg>
           Việt Nam | VNĐ
         </span>
@@ -107,10 +127,10 @@ const handleLogout = async () => {
 
         <!-- SEARCH -->
         <div class="search">
-          <input type="text" placeholder="Tìm kiếm sản phẩm..."/>
+          <input type="text" placeholder="Tìm kiếm sản phẩm..." />
           <svg viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="m21 21-4.3-4.3"/>
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
           </svg>
         </div>
 
@@ -118,7 +138,8 @@ const handleLogout = async () => {
         <div class="dropdown-wrap">
           <button class="icon-btn" @click.stop="toggleWishlist" :class="{ active: showWishlist }">
             <svg viewBox="0 0 24 24" fill="none">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              <path
+                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
             <span class="badge badge-red">{{ wishlistItems.length }}</span>
           </button>
@@ -132,19 +153,20 @@ const handleLogout = async () => {
               <div class="drop-body">
                 <div v-if="wishlistItems.length === 0" class="drop-empty">
                   <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                    <path
+                      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                   </svg>
                   <p>Chưa có sản phẩm yêu thích</p>
                 </div>
                 <div class="wish-item" v-for="item in wishlistItems" :key="item.id">
-                  <img :src="item.img" :alt="item.name"/>
+                  <img :src="item.img" :alt="item.name" />
                   <div class="wish-info">
                     <p class="wish-name">{{ item.name }}</p>
                     <p class="wish-price">{{ item.price }}</p>
                   </div>
                   <button class="wish-remove" @click="removeWishlist(item.id)" title="Xóa">
                     <svg viewBox="0 0 24 24" fill="none">
-                      <path d="M18 6 6 18M6 6l12 12"/>
+                      <path d="M18 6 6 18M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
@@ -162,9 +184,9 @@ const handleLogout = async () => {
         <div class="icon-btn-wrap">
           <router-link to="/cart" class="icon-btn">
             <svg viewBox="0 0 24 24" fill="none">
-              <path d="M6 6h15l-1.5 9h-13z"/>
-              <circle cx="9" cy="20" r="1"/>
-              <circle cx="18" cy="20" r="1"/>
+              <path d="M6 6h15l-1.5 9h-13z" />
+              <circle cx="9" cy="20" r="1" />
+              <circle cx="18" cy="20" r="1" />
             </svg>
           </router-link>
           <span class="badge badge-blue">3</span>
@@ -174,10 +196,10 @@ const handleLogout = async () => {
         <div class="dropdown-wrap">
           <div class="icon-btn-wrap">
             <button class="icon-btn icon-btn-user" @click.stop="toggleUser" :class="{ active: showUser }">
-              <img v-if="user.avatar" :src="user.avatar" class="avatar-img" :alt="user.name"/>
+              <img v-if="user && user.avatar" :src="user.avatar" class="avatar-img" :alt="user.name" />
               <svg v-else viewBox="0 0 24 24" fill="none">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
               </svg>
             </button>
           </div>
@@ -185,36 +207,47 @@ const handleLogout = async () => {
           <transition name="drop">
             <div class="dropdown user-drop" v-if="showUser">
               <div class="user-profile-card">
-                <img :src="user.avatar" :alt="user.name" class="user-avatar"/>
+                <img v-if="user" :src="user.avatar" :alt="user.name" class="user-avatar" />
                 <div class="user-info">
-                  <p class="user-name">{{ user.name }}</p>
-                  <p class="user-email">{{ user.email }}</p>
-                  <span class="user-badge">{{ user.memberSince }}</span>
+                  <p class="user-name">{{ user?.name }}</p>
+                  <p class="user-email">{{ user?.email }}</p>
+                  <span class="user-badge">{{ user?.memberSince }}</span>
                 </div>
               </div>
+
               <div class="drop-divider"></div>
-              <ul class="user-menu">
-                <li>
-                  <router-link to="/profile" @click="showUser = false">
-                    <span class="menu-icon">
-                      <svg viewBox="0 0 24 24" fill="none">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                        <circle cx="12" cy="7" r="4"/>
-                      </svg>
-                    </span>
-                    <span>Thông tin cá nhân</span>
-                    <svg class="menu-arrow" viewBox="0 0 24 24" fill="none">
-                      <path d="m9 18 6-6-6-6"/>
-                    </svg>
-                  </router-link>
-                </li>
-              </ul>
-              <div class="drop-divider"></div>
+
               <div class="drop-footer-user">
-                <button class="logout-btn" @click="handleLogout">
-                  Đăng xuất
-                </button>
+
+                <!-- ADMIN -->
+                <template v-if="user && user.role === 'admin'">
+                  <button class="admin-btn" @click="goAdmin">
+                    ⚙️ Quản trị
+                  </button>
+
+                  <button class="logout-btn" @click="handleLogout">
+                    Đăng xuất
+                  </button>
+                </template>
+
+                <!-- USER -->
+                <template v-else>
+
+                  <!-- Xem thông tin -->
+                  <router-link to="/profile" @click="showUser = false" class="profile-btn">
+                    👤 Thông tin cá nhân
+                  </router-link>
+
+                  <!-- Logout -->
+                  <button class="logout-btn" @click="handleLogout">
+                    Đăng xuất
+                  </button>
+
+                </template>
+
               </div>
+              <div class="drop-divider"></div>
+
             </div>
           </transition>
         </div>
@@ -273,7 +306,9 @@ const handleLogout = async () => {
   transition: color 0.2s;
 }
 
-.topbar-item:hover { color: #e2e8f0; }
+.topbar-item:hover {
+  color: #e2e8f0;
+}
 
 .topbar-item svg {
   width: 13px;
@@ -283,7 +318,30 @@ const handleLogout = async () => {
   fill: none;
 }
 
-.topbar-divider { color: #334155; }
+.topbar-divider {
+  color: #334155;
+}
+
+.admin-btn {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px;
+
+  border-radius: 12px;
+  border: 1px solid #2563eb;
+
+  background: #eff6ff;
+  color: #2563eb;
+
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.admin-btn:hover {
+  background: #2563eb;
+  color: #fff;
+}
 
 /* ── MAIN HEADER ─────────────────────────────────────────── */
 .header {
@@ -292,7 +350,7 @@ const handleLogout = async () => {
   position: sticky;
   top: 0;
   z-index: 1000;
-  box-shadow: 0 1px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.05);
 }
 
 .container {
@@ -313,11 +371,40 @@ const handleLogout = async () => {
   user-select: none;
 }
 
-.logo-black { color: #0f172a; }
-.logo-blue  { color: #2563eb; }
+.logo-black {
+  color: #0f172a;
+}
+
+.logo-blue {
+  color: #2563eb;
+}
+
+.profile-btn {
+  display: block;
+  width: 92%;
+  margin-bottom: 8px;
+  padding: 10px;
+
+  border-radius: 12px;
+  background: #bec0c1;
+  color: #334155;
+
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+
+  transition: 0.2s;
+}
+
+.profile-btn:hover {
+  background: #858788;
+}
 
 /* NAV */
-.nav { display: flex; gap: 28px; }
+.nav {
+  display: flex;
+  gap: 28px;
+}
 
 .nav a {
   text-decoration: none;
@@ -331,9 +418,13 @@ const handleLogout = async () => {
   padding-bottom: 4px;
 }
 
-.nav a:hover { color: #2563eb; }
+.nav a:hover {
+  color: #2563eb;
+}
 
-.nav a.router-link-exact-active { color: #2563eb; }
+.nav a.router-link-exact-active {
+  color: #2563eb;
+}
 
 .nav a.router-link-exact-active::after {
   content: '';
@@ -347,7 +438,11 @@ const handleLogout = async () => {
 }
 
 /* RIGHT */
-.right { display: flex; align-items: center; gap: 10px; }
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
 /* SEARCH */
 .search {
@@ -363,7 +458,7 @@ const handleLogout = async () => {
 
 .search:focus-within {
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   background: #fff;
 }
 
@@ -376,7 +471,9 @@ const handleLogout = async () => {
   color: #1e293b;
 }
 
-.search input::placeholder { color: #94a3b8; }
+.search input::placeholder {
+  color: #94a3b8;
+}
 
 .search svg {
   width: 15px;
@@ -404,7 +501,8 @@ const handleLogout = async () => {
   transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
   text-decoration: none;
   border: none;
-  position: relative; /* needed for badge inside */
+  position: relative;
+  /* needed for badge inside */
 }
 
 .icon-btn:hover {
@@ -426,10 +524,22 @@ const handleLogout = async () => {
 }
 
 /* USER BUTTON */
-.icon-btn-user { background: #2563eb; padding: 0; }
-.icon-btn-user svg { stroke: #fff; }
-.icon-btn-user:hover { background: #1d4ed8; }
-.icon-btn-user.active { box-shadow: 0 0 0 2px #93c5fd; }
+.icon-btn-user {
+  background: #2563eb;
+  padding: 0;
+}
+
+.icon-btn-user svg {
+  stroke: #fff;
+}
+
+.icon-btn-user:hover {
+  background: #1d4ed8;
+}
+
+.icon-btn-user.active {
+  box-shadow: 0 0 0 2px #93c5fd;
+}
 
 .avatar-img {
   width: 38px;
@@ -459,11 +569,18 @@ const handleLogout = async () => {
   z-index: 10;
 }
 
-.badge-blue { background: #2563eb; }
-.badge-red  { background: #ef4444; }
+.badge-blue {
+  background: #2563eb;
+}
+
+.badge-red {
+  background: #ef4444;
+}
 
 /* ── DROPDOWN WRAPPER ────────────────────────────────────── */
-.dropdown-wrap { position: relative; }
+.dropdown-wrap {
+  position: relative;
+}
 
 /* ── DROPDOWN BASE ───────────────────────────────────────── */
 .dropdown {
@@ -472,7 +589,7 @@ const handleLogout = async () => {
   right: 0;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(15,23,42,0.14), 0 4px 16px rgba(15,23,42,0.06);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.14), 0 4px 16px rgba(15, 23, 42, 0.06);
   border: 1px solid #f1f5f9;
   z-index: 2000;
   overflow: hidden;
@@ -493,7 +610,9 @@ const handleLogout = async () => {
 }
 
 /* ── WISHLIST DROPDOWN ───────────────────────────────────── */
-.wishlist-drop { width: 320px; }
+.wishlist-drop {
+  width: 320px;
+}
 
 .drop-header {
   display: flex;
@@ -524,8 +643,14 @@ const handleLogout = async () => {
   padding: 8px 0;
 }
 
-.drop-body::-webkit-scrollbar { width: 4px; }
-.drop-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.drop-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.drop-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
 
 .drop-empty {
   display: flex;
@@ -544,7 +669,9 @@ const handleLogout = async () => {
   fill: none;
 }
 
-.drop-empty p { font-size: 13px; }
+.drop-empty p {
+  font-size: 13px;
+}
 
 .wish-item {
   display: flex;
@@ -554,7 +681,9 @@ const handleLogout = async () => {
   transition: background 0.15s;
 }
 
-.wish-item:hover { background: #f8fafc; }
+.wish-item:hover {
+  background: #f8fafc;
+}
 
 .wish-item img {
   width: 48px;
@@ -565,7 +694,10 @@ const handleLogout = async () => {
   flex-shrink: 0;
 }
 
-.wish-info { flex: 1; min-width: 0; }
+.wish-info {
+  flex: 1;
+  min-width: 0;
+}
 
 .wish-name {
   font-size: 13px;
@@ -598,7 +730,9 @@ const handleLogout = async () => {
   flex-shrink: 0;
 }
 
-.wish-remove:hover { background: #fee2e2; }
+.wish-remove:hover {
+  background: #fee2e2;
+}
 
 .wish-remove svg {
   width: 14px;
@@ -631,7 +765,9 @@ const handleLogout = async () => {
 }
 
 /* ── USER DROPDOWN ───────────────────────────────────────── */
-.user-drop { width: 280px; }
+.user-drop {
+  width: 280px;
+}
 
 .user-profile-card {
   display: flex;
@@ -649,7 +785,9 @@ const handleLogout = async () => {
   flex-shrink: 0;
 }
 
-.user-info { min-width: 0; }
+.user-info {
+  min-width: 0;
+}
 
 .user-name {
   font-size: 14px;
@@ -678,9 +816,16 @@ const handleLogout = async () => {
   letter-spacing: 0.04em;
 }
 
-.drop-divider { height: 1px; background: #f1f5f9; }
+.drop-divider {
+  height: 1px;
+  background: #f1f5f9;
+}
 
-.user-menu { list-style: none; padding: 6px 0; margin: 0; }
+.user-menu {
+  list-style: none;
+  padding: 6px 0;
+  margin: 0;
+}
 
 .user-menu li a {
   display: flex;
@@ -699,8 +844,13 @@ const handleLogout = async () => {
   color: #2563eb;
 }
 
-.user-menu li a:hover .menu-icon { background: #dbeafe; }
-.user-menu li a:hover .menu-icon svg { stroke: #2563eb; }
+.user-menu li a:hover .menu-icon {
+  background: #dbeafe;
+}
+
+.user-menu li a:hover .menu-icon svg {
+  stroke: #2563eb;
+}
 
 .menu-icon {
   width: 32px;
@@ -733,9 +883,13 @@ const handleLogout = async () => {
   flex-shrink: 0;
 }
 
-.user-menu li a:hover .menu-arrow { stroke: #2563eb; }
+.user-menu li a:hover .menu-arrow {
+  stroke: #2563eb;
+}
 
-.drop-footer-user { padding: 12px 18px; }
+.drop-footer-user {
+  padding: 12px 18px;
+}
 
 .logout-btn {
   width: 100%;
@@ -752,7 +906,7 @@ const handleLogout = async () => {
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
-  box-shadow: 0 4px 14px rgba(239,68,68,0.3);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
 }
 
 .logout-btn:hover {
@@ -762,7 +916,7 @@ const handleLogout = async () => {
 
 /* ── TRANSITION ──────────────────────────────────────────── */
 .drop-enter-active {
-  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.34,1.4,0.64,1);
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 .drop-leave-active {

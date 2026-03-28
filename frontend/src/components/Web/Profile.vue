@@ -1,49 +1,167 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Header from '../Layout/Header.vue'
 import Footer from '../Layout/Footer.vue'
+import axios from 'axios'
+
 // ── Active tab ────────────────────────────────────────────
 const activeTab = ref('profile')
 
 const tabs = [
-  { key: 'profile',  label: 'Thông tin cá nhân', icon: 'person' },
-  { key: 'orders',   label: 'Đơn hàng',           icon: 'orders' },
-  { key: 'address',  label: 'Địa chỉ',             icon: 'map' },
-  { key: 'password', label: 'Đổi mật khẩu',        icon: 'lock' },
+  { key: 'profile', label: 'Thông tin cá nhân', icon: 'person' },
+  { key: 'orders', label: 'Đơn hàng', icon: 'orders' },
+  { key: 'address', label: 'Địa chỉ', icon: 'map' },
+  { key: 'password', label: 'Đổi mật khẩu', icon: 'lock' },
 ]
 
 // ── Toast ─────────────────────────────────────────────────
 const toast = ref({ show: false, msg: '' })
 const showToast = (msg) => {
   toast.value = { show: true, msg }
-  setTimeout(() => toast.value.show = false, 2500)
+  setTimeout(() => {
+    toast.value.show = false
+  }, 2500)
 }
 
 // ════════════════════════════════════════════════
 //  TAB 1 — PROFILE
 // ════════════════════════════════════════════════
 const user = ref({
-  name: 'Nguyễn Văn A', email: 'nguyenvana@email.com',
-  phone: '0901 234 567', birthday: '1995-06-15',
-  gender: 'male', avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-  memberSince: 'Elite 2026', joinDate: 'Tháng 3, 2024',
+  name: '',
+  email: '',
+  phone: '',
+  birthday: '',
+  gender: '',
+  avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
+  memberSince: 'Thành viên',
+  joinDate: '',
 })
+
+const profileForm = ref({})
 const editing = ref(false)
 const savingProfile = ref(false)
-const profileForm = ref({ ...user.value })
-const startEdit = () => { profileForm.value = { ...user.value }; editing.value = true }
-const cancelEdit = () => { editing.value = false }
+
+const loadUser = async () => {
+  try {
+    const token = localStorage.getItem('token')
+
+    if (!token) {
+      const storedUser = localStorage.getItem('user')
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser)
+        user.value = {
+          ...user.value,
+          ...parsed,
+          phone: parsed.phone || '',
+          birthday: parsed.birthday || '',
+          gender: parsed.gender || '',
+          memberSince: parsed.memberSince || 'Thành viên',
+          joinDate: parsed.joinDate || '',
+          avatar: parsed.avatar || user.value.avatar,
+        }
+      }
+      return
+    }
+const res = await axios.get('http://127.0.0.1:8000/api/user/profile', {
+    
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const apiUser = res.data
+
+    user.value = {
+      ...user.value,
+      ...apiUser,
+      phone: apiUser.phone || '',
+      birthday: apiUser.birthday || '',
+      gender: apiUser.gender || '',
+      memberSince: apiUser.memberSince || 'Thành viên',
+      joinDate: apiUser.joinDate || '',
+      avatar: apiUser.avatar || user.value.avatar,
+    }
+
+    localStorage.setItem('user', JSON.stringify(user.value))
+  } catch (error) {
+    console.error('Load user lỗi:', error)
+
+    const storedUser = localStorage.getItem('user')
+    if (storedUser) {
+      const parsed = JSON.parse(storedUser)
+      user.value = {
+        ...user.value,
+        ...parsed,
+        phone: parsed.phone || '',
+        birthday: parsed.birthday || '',
+        gender: parsed.gender || '',
+        memberSince: parsed.memberSince || 'Thành viên',
+        joinDate: parsed.joinDate || '',
+        avatar: parsed.avatar || user.value.avatar,
+      }
+    }
+  }
+}
+
+onMounted(() => {
+  loadUser()
+})
+
+const startEdit = () => {
+  profileForm.value = { ...user.value }
+  editing.value = true
+}
+
+const cancelEdit = () => {
+  editing.value = false
+  profileForm.value = {}
+}
+
 const saveProfile = async () => {
-  savingProfile.value = true
-  await new Promise(r => setTimeout(r, 900))
-  user.value = { ...profileForm.value }
-  savingProfile.value = false; editing.value = false
-  showToast('Cập nhật thông tin thành công!')
+  try {
+    savingProfile.value = true
+
+    const token = localStorage.getItem('token')
+
+    //  DEBUG Ở ĐÂY
+    console.log('DATA GỬI:', profileForm.value)
+    console.log('TOKEN:', token)
+
+    const res = await axios.put(
+      'http://127.0.0.1:8000/api/user/profile',
+      {
+        name: profileForm.value.name,
+        email: profileForm.value.email,
+        phone: profileForm.value.phone,
+        date_of_birth: profileForm.value.birthday,
+        gender: profileForm.value.gender,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    )
+
+    user.value = res.data.user
+    localStorage.setItem('user', JSON.stringify(user.value))
+
+    editing.value = false
+    showToast('Cập nhật thành công!')
+
+  } catch (error) {
+    // 👉 DEBUG LỖI
+    console.error('LỖI API:', error.response?.data)
+
+    showToast(error.response?.data?.message || 'Lỗi cập nhật!')
+  } finally {
+    savingProfile.value = false
+  }
 }
 
 const stats = [
-  { label: 'Đơn hàng',    value: '12',    icon: 'orders' },
-  { label: 'Yêu thích',   value: '8',     icon: 'heart' },
+  { label: 'Đơn hàng', value: '12', icon: 'orders' },
+  { label: 'Yêu thích', value: '8', icon: 'heart' },
   { label: 'Điểm thưởng', value: '1.250', icon: 'star' },
 ]
 
@@ -52,64 +170,110 @@ const stats = [
 // ════════════════════════════════════════════════
 const orderTab = ref('all')
 const selectedOrder = ref(null)
+
 const orderTabs = [
   { key: 'all', label: 'Tất cả' },
-  { key: 'pending',   label: 'Chờ xác nhận' },
-  { key: 'shipping',  label: 'Đang giao' },
-  { key: 'done',      label: 'Hoàn thành' },
+  { key: 'pending', label: 'Chờ xác nhận' },
+  { key: 'shipping', label: 'Đang giao' },
+  { key: 'done', label: 'Hoàn thành' },
   { key: 'cancelled', label: 'Đã hủy' },
 ]
+
 const statusMap = {
-  pending:   { label: 'Chờ xác nhận', color: '#f59e0b', bg: '#fef3c7' },
-  shipping:  { label: 'Đang giao',    color: '#2563eb', bg: '#dbeafe' },
-  done:      { label: 'Hoàn thành',   color: '#16a34a', bg: '#dcfce7' },
-  cancelled: { label: 'Đã hủy',       color: '#dc2626', bg: '#fee2e2' },
+  pending: { label: 'Chờ xác nhận', color: '#f59e0b', bg: '#fef3c7' },
+  shipping: { label: 'Đang giao', color: '#2563eb', bg: '#dbeafe' },
+  done: { label: 'Hoàn thành', color: '#16a34a', bg: '#dcfce7' },
+  cancelled: { label: 'Đã hủy', color: '#dc2626', bg: '#fee2e2' },
 }
+
 const orders = ref([
   {
-    id: 'NGL-2026-001', date: '18/03/2026', status: 'done', total: '36.990.000đ',
-    items: [{ name: 'VinaBook Pro X14', qty: 1, price: '36.990.000đ', img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200' }],
+    id: 'NGL-2026-001',
+    date: '18/03/2026',
+    status: 'done',
+    total: '36.990.000đ',
+    items: [
+      {
+        name: 'VinaBook Pro X14',
+        qty: 1,
+        price: '36.990.000đ',
+        img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200',
+      },
+    ],
     steps: [
-      { label: 'Đặt hàng',      date: '15/03/2026 09:12', done: true },
-      { label: 'Xác nhận',      date: '15/03/2026 10:30', done: true },
+      { label: 'Đặt hàng', date: '15/03/2026 09:12', done: true },
+      { label: 'Xác nhận', date: '15/03/2026 10:30', done: true },
       { label: 'Đang đóng gói', date: '16/03/2026 08:00', done: true },
-      { label: 'Đang giao',     date: '17/03/2026 14:20', done: true },
-      { label: 'Hoàn thành',    date: '18/03/2026 11:05', done: true },
-    ]
+      { label: 'Đang giao', date: '17/03/2026 14:20', done: true },
+      { label: 'Hoàn thành', date: '18/03/2026 11:05', done: true },
+    ],
   },
   {
-    id: 'NGL-2026-002', date: '20/03/2026', status: 'shipping', total: '62.990.000đ',
-    items: [{ name: 'Zephyrus Titan 16', qty: 1, price: '62.990.000đ', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200' }],
+    id: 'NGL-2026-002',
+    date: '20/03/2026',
+    status: 'shipping',
+    total: '62.990.000đ',
+    items: [
+      {
+        name: 'Zephyrus Titan 16',
+        qty: 1,
+        price: '62.990.000đ',
+        img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200',
+      },
+    ],
     steps: [
-      { label: 'Đặt hàng',      date: '20/03/2026 14:00', done: true },
-      { label: 'Xác nhận',      date: '20/03/2026 15:10', done: true },
+      { label: 'Đặt hàng', date: '20/03/2026 14:00', done: true },
+      { label: 'Xác nhận', date: '20/03/2026 15:10', done: true },
       { label: 'Đang đóng gói', date: '21/03/2026 09:00', done: true },
-      { label: 'Đang giao',     date: '22/03/2026 08:30', done: true },
-      { label: 'Hoàn thành',    date: null, done: false },
-    ]
+      { label: 'Đang giao', date: '22/03/2026 08:30', done: true },
+      { label: 'Hoàn thành', date: null, done: false },
+    ],
   },
   {
-    id: 'NGL-2026-003', date: '22/03/2026', status: 'pending', total: '48.490.000đ',
-    items: [{ name: 'Creator Studio 15', qty: 1, price: '48.490.000đ', img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=200' }],
+    id: 'NGL-2026-003',
+    date: '22/03/2026',
+    status: 'pending',
+    total: '48.490.000đ',
+    items: [
+      {
+        name: 'Creator Studio 15',
+        qty: 1,
+        price: '48.490.000đ',
+        img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=200',
+      },
+    ],
     steps: [
-      { label: 'Đặt hàng',      date: '22/03/2026 20:05', done: true },
-      { label: 'Xác nhận',      date: null, done: false },
+      { label: 'Đặt hàng', date: '22/03/2026 20:05', done: true },
+      { label: 'Xác nhận', date: null, done: false },
       { label: 'Đang đóng gói', date: null, done: false },
-      { label: 'Đang giao',     date: null, done: false },
-      { label: 'Hoàn thành',    date: null, done: false },
-    ]
+      { label: 'Đang giao', date: null, done: false },
+      { label: 'Hoàn thành', date: null, done: false },
+    ],
   },
   {
-    id: 'NGL-2025-089', date: '10/12/2025', status: 'cancelled', total: '29.990.000đ',
-    items: [{ name: 'SlimBook Air 13', qty: 1, price: '29.990.000đ', img: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=200' }],
+    id: 'NGL-2025-089',
+    date: '10/12/2025',
+    status: 'cancelled',
+    total: '29.990.000đ',
+    items: [
+      {
+        name: 'SlimBook Air 13',
+        qty: 1,
+        price: '29.990.000đ',
+        img: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=200',
+      },
+    ],
     steps: [
       { label: 'Đặt hàng', date: '10/12/2025 11:00', done: true },
-      { label: 'Đã hủy',   date: '10/12/2025 11:45', done: true },
-    ]
+      { label: 'Đã hủy', date: '10/12/2025 11:45', done: true },
+    ],
   },
 ])
+
 const filteredOrders = computed(() =>
-  orderTab.value === 'all' ? orders.value : orders.value.filter(o => o.status === orderTab.value)
+  orderTab.value === 'all'
+    ? orders.value
+    : orders.value.filter((o) => o.status === orderTab.value)
 )
 
 // ════════════════════════════════════════════════
@@ -118,29 +282,97 @@ const filteredOrders = computed(() =>
 const showAddrForm = ref(false)
 const editingAddrIdx = ref(null)
 const savingAddr = ref(false)
-const defaultAddrForm = () => ({ name: '', phone: '', province: '', district: '', ward: '', detail: '', isDefault: false })
+
+const defaultAddrForm = () => ({
+  name: '',
+  phone: '',
+  province: '',
+  district: '',
+  ward: '',
+  detail: '',
+  isDefault: false,
+})
+
 const addrForm = ref(defaultAddrForm())
-const provinces = ['TP. Hồ Chí Minh','Hà Nội','Đà Nẵng','Cần Thơ','Hải Phòng','Biên Hòa','Buôn Ma Thuột']
+
+const provinces = [
+  'TP. Hồ Chí Minh',
+  'Hà Nội',
+  'Đà Nẵng',
+  'Cần Thơ',
+  'Hải Phòng',
+  'Biên Hòa',
+  'Buôn Ma Thuột',
+]
+
 const addresses = ref([
-  { id: 1, name: 'Nguyễn Văn A', phone: '0901 234 567', province: 'TP. Hồ Chí Minh', district: 'Quận 1', ward: 'Phường Bến Nghé', detail: '123 Lê Lợi', isDefault: true },
-  { id: 2, name: 'Nguyễn Văn A', phone: '0912 345 678', province: 'Hà Nội', district: 'Quận Cầu Giấy', ward: 'Phường Dịch Vọng', detail: '45 Nguyễn Phong Sắc', isDefault: false },
+  {
+    id: 1,
+    name: 'Nguyễn Văn A',
+    phone: '0901 234 567',
+    province: 'TP. Hồ Chí Minh',
+    district: 'Quận 1',
+    ward: 'Phường Bến Nghé',
+    detail: '123 Lê Lợi',
+    isDefault: true,
+  },
+  {
+    id: 2,
+    name: 'Nguyễn Văn A',
+    phone: '0912 345 678',
+    province: 'Hà Nội',
+    district: 'Quận Cầu Giấy',
+    ward: 'Phường Dịch Vọng',
+    detail: '45 Nguyễn Phong Sắc',
+    isDefault: false,
+  },
 ])
-const openAddAddr = () => { addrForm.value = defaultAddrForm(); editingAddrIdx.value = null; showAddrForm.value = true }
-const openEditAddr = (i) => { addrForm.value = { ...addresses.value[i] }; editingAddrIdx.value = i; showAddrForm.value = true }
-const cancelAddr = () => { showAddrForm.value = false }
+
+const openAddAddr = () => {
+  addrForm.value = defaultAddrForm()
+  editingAddrIdx.value = null
+  showAddrForm.value = true
+}
+
+const openEditAddr = (i) => {
+  addrForm.value = { ...addresses.value[i] }
+  editingAddrIdx.value = i
+  showAddrForm.value = true
+}
+
+const cancelAddr = () => {
+  showAddrForm.value = false
+}
+
 const saveAddr = async () => {
   savingAddr.value = true
-  await new Promise(r => setTimeout(r, 800))
+  await new Promise((r) => setTimeout(r, 800))
+
   if (editingAddrIdx.value !== null) {
     addresses.value[editingAddrIdx.value] = { ...addrForm.value }
   } else {
-    addresses.value.push({ ...addrForm.value, id: Date.now(), isDefault: addresses.value.length === 0 })
+    addresses.value.push({
+      ...addrForm.value,
+      id: Date.now(),
+      isDefault: addresses.value.length === 0,
+    })
   }
-  savingAddr.value = false; showAddrForm.value = false
+
+  savingAddr.value = false
+  showAddrForm.value = false
   showToast('Địa chỉ đã được cập nhật!')
 }
-const setDefaultAddr = (i) => { addresses.value = addresses.value.map((a, idx) => ({ ...a, isDefault: idx === i })) }
-const removeAddr = (i) => { addresses.value.splice(i, 1) }
+
+const setDefaultAddr = (i) => {
+  addresses.value = addresses.value.map((a, idx) => ({
+    ...a,
+    isDefault: idx === i,
+  }))
+}
+
+const removeAddr = (i) => {
+  addresses.value.splice(i, 1)
+}
 
 // ════════════════════════════════════════════════
 //  TAB 4 — PASSWORD
@@ -160,23 +392,43 @@ const pwStrength = computed(() => {
   if (/[^A-Za-z0-9]/.test(p)) s++
   return s
 })
-const pwStrengthLabel = computed(() => ['', 'Yếu', 'Trung bình', 'Mạnh', 'Rất mạnh'][pwStrength.value])
-const pwStrengthColor = computed(() => ['', '#ef4444', '#f59e0b', '#2563eb', '#16a34a'][pwStrength.value])
+
+const pwStrengthLabel = computed(
+  () => ['', 'Yếu', 'Trung bình', 'Mạnh', 'Rất mạnh'][pwStrength.value]
+)
+
+const pwStrengthColor = computed(
+  () => ['', '#ef4444', '#f59e0b', '#2563eb', '#16a34a'][pwStrength.value]
+)
+
 const pwRequirements = computed(() => [
-  { label: 'Tối thiểu 8 ký tự',    ok: pwForm.value.newPass.length >= 8 },
-  { label: 'Có chữ hoa (A-Z)',      ok: /[A-Z]/.test(pwForm.value.newPass) },
-  { label: 'Có số (0-9)',           ok: /[0-9]/.test(pwForm.value.newPass) },
-  { label: 'Có ký tự đặc biệt',    ok: /[^A-Za-z0-9]/.test(pwForm.value.newPass) },
+  { label: 'Tối thiểu 8 ký tự', ok: pwForm.value.newPass.length >= 8 },
+  { label: 'Có chữ hoa (A-Z)', ok: /[A-Z]/.test(pwForm.value.newPass) },
+  { label: 'Có số (0-9)', ok: /[0-9]/.test(pwForm.value.newPass) },
+  { label: 'Có ký tự đặc biệt', ok: /[^A-Za-z0-9]/.test(pwForm.value.newPass) },
 ])
+
 const savePw = async () => {
   pwErrors.value = {}
-  if (!pwForm.value.current) pwErrors.value.current = 'Vui lòng nhập mật khẩu hiện tại'
-  if (!pwForm.value.newPass) pwErrors.value.newPass = 'Vui lòng nhập mật khẩu mới'
-  else if (pwStrength.value < 2) pwErrors.value.newPass = 'Mật khẩu quá yếu'
-  if (pwForm.value.newPass !== pwForm.value.confirm) pwErrors.value.confirm = 'Mật khẩu không khớp'
+
+  if (!pwForm.value.current) {
+    pwErrors.value.current = 'Vui lòng nhập mật khẩu hiện tại'
+  }
+
+  if (!pwForm.value.newPass) {
+    pwErrors.value.newPass = 'Vui lòng nhập mật khẩu mới'
+  } else if (pwStrength.value < 2) {
+    pwErrors.value.newPass = 'Mật khẩu quá yếu'
+  }
+
+  if (pwForm.value.newPass !== pwForm.value.confirm) {
+    pwErrors.value.confirm = 'Mật khẩu không khớp'
+  }
+
   if (Object.keys(pwErrors.value).length) return
+
   savingPw.value = true
-  await new Promise(r => setTimeout(r, 1000))
+  await new Promise((r) => setTimeout(r, 1000))
   savingPw.value = false
   pwForm.value = { current: '', newPass: '', confirm: '' }
   showToast('Đổi mật khẩu thành công!')

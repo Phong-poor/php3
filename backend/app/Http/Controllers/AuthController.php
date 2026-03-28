@@ -7,6 +7,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\RegisterSuccessMail;
 
 class AuthController extends Controller
 {
@@ -26,9 +30,12 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
+        // 🔥 GỬI EMAIL
+        Mail::to($user->email)->send(new RegisterSuccessMail($user));
+
         return response()->json([
-            'message' => 'Đăng ký thành công',
-            'user' => $user,
+            'message' => 'Đăng ký thành công! Đã gửi email.',
+            'user' => $user
         ], 201);
     }
 
@@ -47,8 +54,11 @@ class AuthController extends Controller
             ], 401);
         }
 
+        $token = $user->createToken('auth_token')->plainTextToken;
+
         return response()->json([
             'message' => 'Đăng nhập thành công',
+            'token' => $token, // 🔥 QUAN TRỌNG
             'user' => $user
         ]);
     }
@@ -64,5 +74,31 @@ class AuthController extends Controller
             'message' => 'Đăng xuất thành công',
         ]);
     }
-    
+
+    public function redirectGoogle()
+    {
+        return Socialite::driver('google')->stateless()->redirect();
+    }
+
+    public function handleGoogle()
+    {
+        $googleUser = Socialite::driver('google')->stateless()->user();
+
+        $user = User::where('email', $googleUser->getEmail())->first();
+
+        if (!$user) {
+            $user = User::create([
+                'name' => $googleUser->getName(),
+                'email' => $googleUser->getEmail(),
+                'password' => bcrypt(Str::random(16)),
+                'role' => 'user'
+            ]);
+        }
+
+        // 🔥 tạo token Sanctum
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        // 👉 redirect về FE
+        return redirect("http://localhost:5173/login-success?token=$token");
+    }
 }
