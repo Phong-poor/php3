@@ -1,34 +1,49 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '../../services/api'
 
 import Header from '../Layout/Header.vue'
 import Footer from '../Layout/Footer.vue'
 
+const router = useRouter()
+const isLoading = ref(true)
+const isSubmitting = ref(false)
+
 const form = ref({
-  name: '',
+  name: '', // Sẽ tự fill nếu user đã log
   phone: '',
   email: '',
   address: ''
 })
 
 const payment = ref('cod')
+const cart = ref([])
 
-const cart = ref([
-  {
-    name: 'Precision Workstation X1',
-    desc: '32GB RAM / 1TB SSD',
-    price: 45990000,
-    qty: 1,
-    img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200'
-  },
-  {
-    name: 'Mechanical Key Studio',
-    desc: 'Tactile Switches / RGB',
-    price: 3250000,
-    qty: 1,
-    img: 'https://images.unsplash.com/photo-1511385348-a52b4a160dc2?w=200'
-  }
-])
+const fetchCart = async () => {
+    try {
+        isLoading.value = true
+        const response = await api.get('/gio-hang')
+        if (response.data.success) {
+            cart.value = response.data.gio_hang.map(item => ({
+                id_giohang: item.id_giohang,
+                name: item.ten_san_pham,
+                desc: item.ten_bienthe,
+                price: item.gia,
+                qty: item.soluong,
+                img: item.hinh_anh || 'https://via.placeholder.com/200'
+            }))
+        }
+    } catch (error) {
+        console.error('Lỗi khi tải giỏ hàng:', error)
+    } finally {
+        isLoading.value = false
+    }
+}
+
+onMounted(() => {
+    fetchCart()
+})
 
 const subtotal = computed(() =>
   cart.value.reduce((sum, i) => sum + i.price * i.qty, 0)
@@ -38,6 +53,31 @@ const tax = computed(() => subtotal.value * 0.1)
 const total = computed(() => subtotal.value + tax.value)
 
 const format = (n) => n.toLocaleString('vi-VN') + 'đ'
+
+const confirmOrder = async () => {
+    if (!form.value.address) {
+        alert('Vui lòng nhập địa chỉ nhận hàng!')
+        return
+    }
+
+    try {
+        isSubmitting.value = true
+        const response = await api.post('/checkout', {
+            diachi: form.value.address,
+            PTTT: payment.value === 'cod' ? 'COD' : (payment.value === 'bank' ? 'Chuyển khoản' : 'Ví điện tử')
+        })
+
+        if (response.data.success) {
+            alert('🎉 Đặt hàng thành công!')
+            router.push('/profile') // Chuyển về trang profile để xem đơn hàng
+        }
+    } catch (error) {
+        const msg = error.response?.data?.message || 'Có lỗi xảy ra khi đặt hàng.'
+        alert('❌ ' + msg)
+    } finally {
+        isSubmitting.value = false
+    }
+}
 </script>
 
 <template>
@@ -147,8 +187,9 @@ const format = (n) => n.toLocaleString('vi-VN') + 'đ'
             <b>{{ format(total) }}</b>
           </div>
 
-          <button class="btn">
-            Xác nhận đặt hàng
+          <button class="btn" @click="confirmOrder" :disabled="isSubmitting || cart.length === 0">
+            <span v-if="isSubmitting">⏳ Đang xử lý...</span>
+            <span v-else>Xác nhận đặt hàng</span>
           </button>
 
           <p class="secure">🔒 Giao dịch được bảo mật 256-bit</p>
