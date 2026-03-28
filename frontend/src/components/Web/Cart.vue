@@ -17,7 +17,7 @@ const hienThiThongBao = (type, message) => {
     setTimeout(() => { thongBao.value.show = false }, 3000)
 }
 
-// ===================== FETCH GIỎ HÀNG =====================
+//giỏ hàng 
 const fetchGioHang = async () => {
     try {
         isLoading.value = true
@@ -30,11 +30,9 @@ const fetchGioHang = async () => {
     }
 }
 
-// ===================== TÍNH TIỀN =====================
 const subtotal = computed(() => cart.value.reduce((sum, item) => sum + item.thanh_tien, 0))
 const total = computed(() => subtotal.value - discount.value)
 
-// ===================== CẬP NHẬT SỐ LƯỢNG =====================
 const capNhatSoLuong = async (item, delta) => {
     const soLuongMoi = item.soluong + delta
     if (soLuongMoi < 1) return
@@ -55,7 +53,7 @@ const capNhatSoLuong = async (item, delta) => {
     }
 }
 
-// ===================== XÓA MỘT SẢN PHẨM =====================
+// XÓA MỘT SẢN PHẨM 
 const xoaSanPham = async (index) => {
     const item = cart.value[index]
     cart.value.splice(index, 1) // Optimistic
@@ -69,7 +67,7 @@ const xoaSanPham = async (index) => {
     }
 }
 
-// ===================== XÓA TOÀN BỘ =====================
+//  XÓA TOÀN BỘ 
 const xoaTatCa = async () => {
     if (!confirm('Bạn có chắc muốn xóa toàn bộ giỏ hàng?')) return
     try {
@@ -82,14 +80,14 @@ const xoaTatCa = async () => {
     }
 }
 
-// ===================== MÃ GIẢM GIÁ (demo) =====================
+// MÃ GIẢM GIÁ (demo) 
 const apDungMa = () => {
     if (coupon.value.toUpperCase() === 'SALE10') {
         discount.value = Math.round(subtotal.value * 0.1)
-        hienThiThongBao('success', '🎉 Áp dụng mã SALE10 – giảm 10%!')
+        hienThiThongBao('success', ' Áp dụng mã SALE10 – giảm 10%!')
     } else if (coupon.value.toUpperCase() === 'GIAMGIA') {
         discount.value = 3000000
-        hienThiThongBao('success', '🎉 Áp dụng mã thành công – giảm 3.000.000đ!')
+        hienThiThongBao('success', ' Áp dụng mã thành công – giảm 3.000.000đ!')
     } else {
         hienThiThongBao('error', 'Mã giảm giá không hợp lệ.')
     }
@@ -153,7 +151,7 @@ const suggest = [
                             <h3>{{ item.ten_san_pham }}</h3>
                             <p>{{ item.ten_bienthe }}</p>
 
-                            <!-- THUỘC TÍNH (màu sắc, bộ nhớ...) -->
+                         
                             <div class="attr-tags" v-if="item.thuoc_tinh && item.thuoc_tinh.length">
                                 <span v-for="attr in item.thuoc_tinh" :key="attr.ten_thuoctinh" class="attr-tag">
                                     {{ attr.ten_thuoctinh }}: {{ attr.giatri }}
@@ -236,7 +234,7 @@ const suggest = [
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
-/* ===== TOAST ===== */
+
 .toast {
     position: fixed;
     top: 20px;

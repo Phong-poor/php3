@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../../services/api'
 
 import Header from '../Layout/Header.vue'
@@ -8,7 +8,7 @@ import Footer from '../Layout/Footer.vue'
 
 const route = useRoute()
 const isLoading = ref(true)
-
+const router = useRouter()
 // ===================== STATE GIỎ HÀNG =====================
 const soLuongMua = ref(1)
 const dangThem = ref(false)
@@ -88,24 +88,46 @@ const tangSoLuong = () => {
     if (soLuongMua.value < maxTonKho) soLuongMua.value++
 }
 
-// ===================== THÊM GIỎ HÀNG =====================
+// THÊM GIỎ HÀNG
 const themVaoGioHang = async () => {
+
+    // ✅ CHECK ĐĂNG NHẬP TRƯỚC
+    const token = localStorage.getItem('token')
+    if (!token) {
+        hienThiThongBao('error', 'Vui lòng đăng nhập trước!')
+        setTimeout(() => {
+            router.push({
+                path: '/login',
+                query: { redirect: route.fullPath }
+            })
+        }, 1000)
+        return
+    }
+
+    // ======================
     if (!selectedVariant.value) {
         hienThiThongBao('error', 'Vui lòng chọn biến thể sản phẩm!')
         return
     }
+
     if (selectedVariant.value.soluong === 0) {
         hienThiThongBao('error', 'Sản phẩm này đã hết hàng!')
         return
     }
 
     dangThem.value = true
+
     try {
         await api.post('/gio-hang/them', {
             id_bienthe: selectedVariant.value.id_bienthe,
             soluong: soLuongMua.value,
         })
+
         hienThiThongBao('success', '✅ Đã thêm vào giỏ hàng!')
+
+        // 🔥 cập nhật badge header
+        window.dispatchEvent(new Event('cart-updated'))
+
     } catch (err) {
         const msg = err.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại!'
         hienThiThongBao('error', msg)
@@ -113,7 +135,6 @@ const themVaoGioHang = async () => {
         dangThem.value = false
     }
 }
-
 // ===================== FORMAT =====================
 const formatPrice = (price) => {
     if (!price) return '0đ'
@@ -176,7 +197,7 @@ const related = [
 <template>
     <Header />
 
-    <!-- THÔNG BÁO NỔI -->
+    
     <transition name="slide-down">
         <div v-if="thongBao.show" :class="['toast', thongBao.type]">
             {{ thongBao.message }}
@@ -221,7 +242,7 @@ const related = [
                             {{ selectedVariant ? formatPrice(selectedVariant.gia) : formatPrice(product.gia) }}
                         </div>
 
-                        <!-- TỒN KHO -->
+                      
                         <div class="variant-stock" v-if="selectedVariant">
                             <span v-if="selectedVariant.soluong > 0" class="in-stock">
                                 ✅ Còn hàng: {{ selectedVariant.soluong }} sản phẩm
@@ -229,7 +250,6 @@ const related = [
                             <span v-else class="out-stock">❌ Hết hàng</span>
                         </div>
 
-                        <!-- BIẾN THỂ -->
                         <div class="product-options" v-if="product.bienThes && product.bienThes.length > 0">
                             <div class="option-group" v-for="group in variantGroups" :key="group.name">
                                 <p class="option-label">{{ group.name }}:</p>
@@ -258,7 +278,7 @@ const related = [
                             <p style="color:#666; font-size:14px;">Sản phẩm đang cập nhật tùy chọn.</p>
                         </div>
 
-                        <!-- ===== CHỌN SỐ LƯỢNG MUA ===== -->
+                
                         <div class="qty-wrap" v-if="selectedVariant && selectedVariant.soluong > 0">
                             <p class="option-label">Số lượng:</p>
                             <div class="qty-control">
@@ -269,21 +289,21 @@ const related = [
                             </div>
                         </div>
 
-                        <!-- ===== ACTIONS ===== -->
+                        
                         <div class="actions">
                             <button class="add"
                                 :disabled="!selectedVariant || selectedVariant.soluong === 0 || dangThem"
                                 :class="{ 'disabled-btn': !selectedVariant || selectedVariant.soluong === 0 }"
                                 @click="themVaoGioHang">
-                                <span v-if="dangThem">⏳ Đang thêm...</span>
-                                <span v-else>🛒 Thêm vào giỏ hàng</span>
+                                <span v-if="dangThem"> Đang thêm...</span>
+                                <span v-else> Thêm vào giỏ hàng</span>
                             </button>
                             <button class="install">Trả góp 0%</button>
                         </div>
 
                         <div class="info">
-                            <span>🚚 Giao nhanh 2h</span>
-                            <span>🛡️ Bảo hành 24 tháng</span>
+                            <span>Giao nhanh 2h</span>
+                            <span>Bảo hành 24 tháng</span>
                         </div>
                     </div>
                 </div>

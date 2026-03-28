@@ -45,7 +45,22 @@ onUnmounted(() => {
   window.removeEventListener('cart-updated', handleCartUpdated)
   document.removeEventListener('click', handleOutside)
 })
+const goToCart = () => {
+  const token = localStorage.getItem('token')
 
+  if (!token) {
+    alert('Vui lòng đăng nhập trước!')
+
+    router.push({
+      path: '/login',
+      query: { redirect: '/cart' }
+    })
+
+    return
+  }
+
+  router.push('/cart')
+}
 // ===================== WISHLIST / USER DROPDOWN =====================
 const toggleWishlist = () => {
   showWishlist.value = !showWishlist.value
@@ -206,13 +221,14 @@ const handleLogout = async () => {
 
         <!-- ===== CART (SỐ LƯỢNG THẬT TỪ API) ===== -->
         <div class="icon-btn-wrap">
-          <router-link to="/cart" class="icon-btn" @click="fetchCartCount">
+          <button class="icon-btn" @click="goToCart">
             <svg viewBox="0 0 24 24" fill="none">
               <path d="M6 6h15l-1.5 9h-13z" />
               <circle cx="9" cy="20" r="1" />
               <circle cx="18" cy="20" r="1" />
             </svg>
-          </router-link>
+          </button>
+
           <span class="badge badge-blue" v-if="cartCount > 0">
             {{ cartCount > 99 ? '99+' : cartCount }}
           </span>
