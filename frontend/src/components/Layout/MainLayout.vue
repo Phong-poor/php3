@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Chatbot from '../Web/Chatbot.vue'
 
+
 const route = useRoute()
 
 const showChatbot = computed(() =>

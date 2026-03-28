@@ -15,6 +15,14 @@ use App\Http\Controllers\SanPhamController;
 use App\Http\Controllers\BienTheController;
 use App\Http\Controllers\BienTheHinhAnhController;
 
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/user/profile', [UserController::class, 'profile']);
+    Route::put('/user/profile', [UserController::class, 'updateProfile']);
+});
+
+Route::get('/auth/google', [AuthController::class, 'redirectGoogle']);
+Route::get('/auth/google/callback', [AuthController::class, 'handleGoogle']);
+
 
 
 
@@ -95,11 +103,12 @@ Route::get('/test', function () {
     return 'OK API';
 });
 
-Route::middleware('admin')->group(function () {
-    Route::get('/admin/dashboard', function () {
-        return response()->json([
-            'message' => 'Welcome admin'
-        ]);
+Route::middleware(['auth:sanctum', 'admin'])
+    ->prefix('admin')
+    ->group(function () {
+        Route::get('/users', [UserController::class, 'index']);
+        Route::get('/users/{id}', [UserController::class, 'show']);
+        Route::post('/users', [UserController::class, 'store']);
+        Route::put('/users/{id}', [UserController::class, 'update']);
+        Route::delete('/users/{id}', [UserController::class, 'destroy']);
     });
-
-});

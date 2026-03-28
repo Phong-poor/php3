@@ -51,7 +51,7 @@ onMounted(async () => {
     // Hiện popup sau 10 giây
     setTimeout(() => {
         showGift.value = true
-    }, 10000)
+    }, 60000)
 
     try {
         const response = await api.get('/sanpham')
@@ -112,6 +112,7 @@ onUnmounted(stop)
 
 <template>
     <Header />
+    
     <GiftPopup v-if="showGift" :delay="0" />
 
     <main class="home">

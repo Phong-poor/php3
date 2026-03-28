@@ -4,16 +4,23 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class AdminMiddleware
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (!$user || $user->role !== 'admin') {
+        if (!$user) {
             return response()->json([
-                'message' => 'Không có quyền truy cập'
+                'message' => 'Chưa đăng nhập'
+            ], 401);
+        }
+
+        if ($user->role !== 'admin') {
+            return response()->json([
+                'message' => 'Bạn không có quyền vào trang admin'
             ], 403);
         }
 
