@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '../../services/api' // Gọi API bằng file config của bạn
+import api from '../../services/api'
 
 import Header from '../Layout/Header.vue'
 import Footer from '../Layout/Footer.vue'
@@ -9,7 +9,17 @@ import Footer from '../Layout/Footer.vue'
 const route = useRoute()
 const isLoading = ref(true)
 
-// Khởi tạo product với cấu trúc sẵn để không bị lỗi lúc chưa load xong
+// ===================== STATE GIỎ HÀNG =====================
+const soLuongMua = ref(1)
+const dangThem = ref(false)
+const thongBao = ref({ show: false, type: '', message: '' })
+
+const hienThiThongBao = (type, message) => {
+    thongBao.value = { show: true, type, message }
+    setTimeout(() => { thongBao.value.show = false }, 3000)
+}
+
+// ===================== STATE SẢN PHẨM =====================
 const product = ref({
     tenSP: 'Đang tải...',
     gia: 0,
@@ -22,184 +32,158 @@ const product = ref({
 const selectedImage = ref('https://via.placeholder.com/600')
 const selectedVariant = ref(null)
 const selectedOptions = ref({})
-const getVariantAttributes = (variant) => {
-    return variant?.thuoc_tinh || variant?.attributes || []
-}
 
-const getAttrValue = (variant, attrName) => {
-    const attrs = getVariantAttributes(variant)
-    const found = attrs.find(item => item.ten_thuoctinh === attrName)
-    return found ? found.giatri : null
-}
+// ===================== HELPERS BIẾN THỂ =====================
+const getVariantAttributes = (variant) =>
+    variant?.thuoc_tinh || variant?.attributes ||
+    (variant?.thuoc_tinh_json
+        ? (typeof variant.thuoc_tinh_json === 'string'
+            ? JSON.parse(variant.thuoc_tinh_json)
+            : variant.thuoc_tinh_json)
+        : [])
 
-const getColorCode = (variant) => {
-    const attrs = getVariantAttributes(variant)
-    const found = attrs.find(item => item.ten_thuoctinh === 'Màu sắc')
-    return found?.ma_mau || '#ccc'
-}
 const variantGroups = computed(() => {
     const variants = product.value.bienThes || []
     const map = new Map()
 
     variants.forEach(variant => {
-        const attrs = getVariantAttributes(variant)
-
-        attrs.forEach(attr => {
-            const name = attr.ten_thuoctinh
-            if (!map.has(name)) map.set(name, [])
-
-            const exists = map.get(name).some(v => v.giatri === attr.giatri)
-            if (!exists) {
-                map.get(name).push({
-                    giatri: attr.giatri,
-                    ma_mau: attr.ma_mau || null
-                })
-            }
+        getVariantAttributes(variant).forEach(attr => {
+            if (!map.has(attr.ten_thuoctinh)) map.set(attr.ten_thuoctinh, [])
+            const exists = map.get(attr.ten_thuoctinh).some(v => v.giatri === attr.giatri)
+            if (!exists) map.get(attr.ten_thuoctinh).push({ giatri: attr.giatri, ma_mau: attr.ma_mau || null })
         })
     })
 
-    const groups = Array.from(map.entries()).map(([name, values]) => ({
-        name,
-        values
-    }))
-
-    groups.sort((a, b) => {
-        if (a.name === 'Màu sắc') return -1
-        if (b.name === 'Màu sắc') return 1
-        return 0
-    })
-
-    return groups
+    return Array.from(map.entries())
+        .map(([name, values]) => ({ name, values }))
+        .sort((a, b) => (a.name === 'Màu sắc' ? -1 : b.name === 'Màu sắc' ? 1 : 0))
 })
+
 const findMatchingVariant = () => {
     const variants = product.value.bienThes || []
-
-    return variants.find(variant => {
-        const attrs = getVariantAttributes(variant)
-
-        return Object.entries(selectedOptions.value).every(([attrName, attrValue]) => {
-            const found = attrs.find(item => item.ten_thuoctinh === attrName)
+    return variants.find(variant =>
+        Object.entries(selectedOptions.value).every(([attrName, attrValue]) => {
+            const found = getVariantAttributes(variant).find(i => i.ten_thuoctinh === attrName)
             return found && found.giatri === attrValue
         })
-    }) || null
+    ) || null
 }
+
 const handleSelectOption = (groupName, value) => {
-    selectedOptions.value = {
-        ...selectedOptions.value,
-        [groupName]: value
+    selectedOptions.value = { ...selectedOptions.value, [groupName]: value }
+    const matched = findMatchingVariant()
+    if (matched) selectedVariant.value = matched
+}
+
+// Reset số lượng khi đổi biến thể
+const handleSelectOptionWithReset = (groupName, value) => {
+    handleSelectOption(groupName, value)
+    soLuongMua.value = 1
+}
+
+// ===================== SỐ LƯỢNG MUA =====================
+const giamSoLuong = () => { if (soLuongMua.value > 1) soLuongMua.value-- }
+const tangSoLuong = () => {
+    const maxTonKho = selectedVariant.value?.soluong ?? 999
+    if (soLuongMua.value < maxTonKho) soLuongMua.value++
+}
+
+// ===================== THÊM GIỎ HÀNG =====================
+const themVaoGioHang = async () => {
+    if (!selectedVariant.value) {
+        hienThiThongBao('error', 'Vui lòng chọn biến thể sản phẩm!')
+        return
+    }
+    if (selectedVariant.value.soluong === 0) {
+        hienThiThongBao('error', 'Sản phẩm này đã hết hàng!')
+        return
     }
 
-    const matched = findMatchingVariant()
-    if (matched) {
-        selectedVariant.value = matched
+    dangThem.value = true
+    try {
+        await api.post('/gio-hang/them', {
+            id_bienthe: selectedVariant.value.id_bienthe,
+            soluong: soLuongMua.value,
+        })
+        hienThiThongBao('success', '✅ Đã thêm vào giỏ hàng!')
+    } catch (err) {
+        const msg = err.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại!'
+        hienThiThongBao('error', msg)
+    } finally {
+        dangThem.value = false
     }
 }
-// Hàm Format Tiền
+
+// ===================== FORMAT =====================
 const formatPrice = (price) => {
     if (!price) return '0đ'
     return new Intl.NumberFormat('vi-VN').format(price) + 'đ'
 }
 
-// Hàm xử lý đường dẫn ảnh
 const getImageUrl = (path) => {
     if (!path) return 'https://via.placeholder.com/600'
     if (path.startsWith('http') || path.startsWith('data:image')) return path
     return `http://127.0.0.1:8000/storage/${path}`
 }
 
-// Gom ảnh bìa và ảnh phụ
 const allImages = computed(() => {
     if (!product.value) return []
     let images = []
     if (product.value.hinhanh) images.push(getImageUrl(product.value.hinhanh))
-    
     const listHinhAnh = product.value.hinh_anhs || product.value.hinhAnhs || []
-    listHinhAnh.forEach(img => {
-        images.push(getImageUrl(img.duongdan))
-    })
-    
+    listHinhAnh.forEach(img => images.push(getImageUrl(img.duongdan)))
     return images.length > 0 ? images : ['https://via.placeholder.com/600']
 })
 
-// GỌI API LẤY DỮ LIỆU
+// ===================== FETCH SẢN PHẨM =====================
 const fetchProductDetail = async () => {
     try {
         isLoading.value = true
-        const productId = route.params.id || 1 // Lấy ID từ URL
-        
+        const productId = route.params.id || 1
         const response = await api.get(`/sanpham/${productId}`)
-        
-        // Chuẩn hóa dữ liệu
         const data = response.data
         const variants = data.bien_thes || data.bienThes || []
-        
         product.value = { ...data, bienThes: variants }
 
-        if (allImages.value.length > 0) {
-            selectedImage.value = allImages.value[0]
-        }
+        if (allImages.value.length > 0) selectedImage.value = allImages.value[0]
 
-        // MẶC ĐỊNH: Chọn nút đầu tiên
         if (variants.length > 0) {
             const firstVariant = variants[0]
             selectedVariant.value = firstVariant
-
-            const attrs = getVariantAttributes(firstVariant)
             const defaultOptions = {}
-
-            attrs.forEach(attr => {
+            getVariantAttributes(firstVariant).forEach(attr => {
                 defaultOptions[attr.ten_thuoctinh] = attr.giatri
             })
-
             selectedOptions.value = defaultOptions
         }
-
     } catch (error) {
-        console.error("Lỗi khi tải chi tiết sản phẩm:", error)
+        console.error('Lỗi khi tải chi tiết sản phẩm:', error)
     } finally {
         isLoading.value = false
     }
 }
 
-onMounted(() => {
-    fetchProductDetail()
-    
-})
+onMounted(() => { fetchProductDetail() })
 
 const related = [
-    {
-        name: 'Precision Air 14 Ultrabook',
-        spec: 'Core i7 · 16GB RAM · 512GB SSD',
-        price: '32.990.000đ',
-        img: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=300'
-    },
-    {
-        name: 'Precision Studio 16 Pro',
-        spec: 'Core i9 · 64GB RAM · 2TB SSD',
-        price: '58.990.000đ',
-        img: 'https://images.unsplash.com/photo-1511385348-a52b4a160dc2?w=300'
-    },
-    {
-        name: 'Workstation Go X7',
-        spec: 'Core i7 · 32GB RAM · 1TB SSD',
-        price: '39.490.000đ',
-        img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300'
-    },
-    {
-        name: 'Precision Slim 13 Ultra',
-        spec: 'Core i5 · 16GB RAM · 512GB SSD',
-        price: '26.990.000đ',
-        img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=300'
-    }
+    { name: 'Precision Air 14 Ultrabook', spec: 'Core i7 · 16GB RAM · 512GB SSD', price: '32.990.000đ', img: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=300' },
+    { name: 'Precision Studio 16 Pro', spec: 'Core i9 · 64GB RAM · 2TB SSD', price: '58.990.000đ', img: 'https://images.unsplash.com/photo-1511385348-a52b4a160dc2?w=300' },
+    { name: 'Workstation Go X7', spec: 'Core i7 · 32GB RAM · 1TB SSD', price: '39.490.000đ', img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=300' },
+    { name: 'Precision Slim 13 Ultra', spec: 'Core i5 · 16GB RAM · 512GB SSD', price: '26.990.000đ', img: 'https://images.unsplash.com/photo-1587202372775-e229f172b9d7?w=300' },
 ]
 </script>
 
 <template>
+    <Header />
 
-<Header />
+    <!-- THÔNG BÁO NỔI -->
+    <transition name="slide-down">
+        <div v-if="thongBao.show" :class="['toast', thongBao.type]">
+            {{ thongBao.message }}
+        </div>
+    </transition>
 
     <div class="page">
-
         <div class="container">
 
             <div v-if="isLoading" style="text-align: center; padding: 50px;">
@@ -213,88 +197,86 @@ const related = [
 
                 <div class="detail">
 
+                    <!-- ẢNH -->
                     <div>
                         <div class="main-img">
                             <img :src="selectedImage" />
                         </div>
-
                         <div class="thumbs">
                             <img v-for="(img, i) in allImages" :key="i" :src="img" @click="selectedImage = img"
                                 :class="{ active: selectedImage === img }" />
                         </div>
                     </div>
 
+                    <!-- THÔNG TIN -->
                     <div>
                         <span class="tag" v-if="product.thuong_hieu">{{ product.thuong_hieu.ten_thuonghieu }}</span>
                         <span class="tag" v-else>MỚI NHẤT 2026</span>
 
                         <h1>{{ product.tenSP }}</h1>
 
-                        <div class="rating">
-                            ⭐⭐⭐⭐⭐ (Chưa có đánh giá)
-                        </div>
+                        <div class="rating">⭐⭐⭐⭐⭐ (Chưa có đánh giá)</div>
 
                         <div class="price">
                             {{ selectedVariant ? formatPrice(selectedVariant.gia) : formatPrice(product.gia) }}
                         </div>
+
+                        <!-- TỒN KHO -->
                         <div class="variant-stock" v-if="selectedVariant">
                             <span v-if="selectedVariant.soluong > 0" class="in-stock">
-                                Còn hàng: {{ selectedVariant.soluong }} sản phẩm
+                                ✅ Còn hàng: {{ selectedVariant.soluong }} sản phẩm
                             </span>
-                            <span v-else class="out-stock">
-                                Hết hàng
-                            </span>
+                            <span v-else class="out-stock">❌ Hết hàng</span>
                         </div>
+
+                        <!-- BIẾN THỂ -->
                         <div class="product-options" v-if="product.bienThes && product.bienThes.length > 0">
-                            <div
-                                class="option-group"
-                                v-for="group in variantGroups"
-                                :key="group.name"
-                            >
+                            <div class="option-group" v-for="group in variantGroups" :key="group.name">
                                 <p class="option-label">{{ group.name }}:</p>
 
-                                <!-- MÀU SẮC -->
                                 <div v-if="group.name === 'Màu sắc'" class="color-list">
-                                    <button
-                                        v-for="item in group.values"
-                                        :key="item.giatri"
-                                        class="color-btn"
+                                    <button v-for="item in group.values" :key="item.giatri" class="color-btn"
                                         :class="{ active: selectedOptions[group.name] === item.giatri }"
-                                        @click="handleSelectOption(group.name, item.giatri)"
-                                        :title="item.giatri"
-                                    >
-                                        <span
-                                            class="color-dot"
-                                            :style="{ backgroundColor: item.ma_mau || '#ccc' }"
-                                        ></span>
+                                        @click="handleSelectOptionWithReset(group.name, item.giatri)"
+                                        :title="item.giatri">
+                                        <span class="color-dot"
+                                            :style="{ backgroundColor: item.ma_mau || '#ccc' }"></span>
                                     </button>
                                 </div>
 
-                                <!-- CÁC THUỘC TÍNH KHÁC -->
                                 <div v-else class="variant-grid">
-                                    <button
-                                        v-for="item in group.values"
-                                        :key="item.giatri"
-                                        class="variant-item-btn"
+                                    <button v-for="item in group.values" :key="item.giatri" class="variant-item-btn"
                                         :class="{ active: selectedOptions[group.name] === item.giatri }"
-                                        @click="handleSelectOption(group.name, item.giatri)"
-                                    >
+                                        @click="handleSelectOptionWithReset(group.name, item.giatri)">
                                         {{ item.giatri }}
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="product-options" v-else>
-                            <p style="color: #666; font-size: 14px;">Sản phẩm này đang được cập nhật tùy chọn.</p>
+                            <p style="color:#666; font-size:14px;">Sản phẩm đang cập nhật tùy chọn.</p>
                         </div>
+
+                        <!-- ===== CHỌN SỐ LƯỢNG MUA ===== -->
+                        <div class="qty-wrap" v-if="selectedVariant && selectedVariant.soluong > 0">
+                            <p class="option-label">Số lượng:</p>
+                            <div class="qty-control">
+                                <button @click="giamSoLuong" :disabled="soLuongMua <= 1">−</button>
+                                <span>{{ soLuongMua }}</span>
+                                <button @click="tangSoLuong"
+                                    :disabled="soLuongMua >= selectedVariant.soluong">+</button>
+                            </div>
+                        </div>
+
+                        <!-- ===== ACTIONS ===== -->
                         <div class="actions">
-                            <button 
-                                class="add"
-                                :disabled="!selectedVariant || selectedVariant.soluong === 0"
+                            <button class="add"
+                                :disabled="!selectedVariant || selectedVariant.soluong === 0 || dangThem"
                                 :class="{ 'disabled-btn': !selectedVariant || selectedVariant.soluong === 0 }"
-                            >
-                                🛒 Thêm vào giỏ hàng
+                                @click="themVaoGioHang">
+                                <span v-if="dangThem">⏳ Đang thêm...</span>
+                                <span v-else>🛒 Thêm vào giỏ hàng</span>
                             </button>
                             <button class="install">Trả góp 0%</button>
                         </div>
@@ -304,12 +286,10 @@ const related = [
                             <span>🛡️ Bảo hành 24 tháng</span>
                         </div>
                     </div>
-
                 </div>
 
-
+                <!-- ĐÁNH GIÁ -->
                 <div class="reviews">
-
                     <div class="review-header">
                         <div>
                             <h2>Đánh giá từ người dùng</h2>
@@ -317,67 +297,136 @@ const related = [
                         </div>
                         <button>Viết đánh giá</button>
                     </div>
-
                     <div class="review-list">
-                        <div class="review-card">
-                            <b>Nguyễn Hoàng</b>
+                        <div class="review-card"><b>Nguyễn Hoàng</b>
                             <p class="role">Designer</p>
                             <p class="stars">★★★★★</p>
                             <p>"Màn OLED cực đẹp!"</p>
                         </div>
-
-                        <div class="review-card">
-                            <b>Trần Phan</b>
+                        <div class="review-card"><b>Trần Phan</b>
                             <p class="role">Dev</p>
                             <p class="stars">★★★★★</p>
                             <p>"Chạy code cực mượt."</p>
                         </div>
-
-                        <div class="review-card">
-                            <b>Lê Minh</b>
+                        <div class="review-card"><b>Lê Minh</b>
                             <p class="role">Business</p>
                             <p class="stars">★★★★★</p>
                             <p>"Pin trâu, ổn định."</p>
                         </div>
                     </div>
-
                 </div>
-            </div>
 
+            </div>
         </div>
     </div>
 
+    <!-- SẢN PHẨM TƯƠNG TỰ -->
     <div class="related">
-
         <div class="related-header">
             <h2>Sản phẩm tương tự</h2>
             <a href="#">Xem tất cả →</a>
         </div>
-
         <div class="related-list">
             <div class="product-card" v-for="(p, i) in related" :key="i">
-                <div class="img-box">
-                    <img :src="p.img" />
-                </div>
-
+                <div class="img-box"><img :src="p.img" /></div>
                 <h4>{{ p.name }}</h4>
                 <p class="sub">{{ p.spec }}</p>
                 <p class="price">{{ p.price }}</p>
             </div>
         </div>
-
     </div>
 
-<Footer />
-
+    <Footer />
 </template>
 
 <style scoped>
+/* ===== TOAST THÔNG BÁO ===== */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    color: white;
+}
+
+.toast.success {
+    background: #16a34a;
+}
+
+.toast.error {
+    background: #dc2626;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+    transition: all 0.3s ease;
+}
+
+.slide-down-enter-from {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+.slide-down-leave-to {
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+/* ===== CHỌN SỐ LƯỢNG ===== */
+.qty-wrap {
+    margin-bottom: 20px;
+}
+
+.qty-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.qty-control button {
+    width: 38px;
+    height: 38px;
+    border: none;
+    background: #f1f5f9;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.qty-control button:hover:not(:disabled) {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.qty-control button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.qty-control span {
+    min-width: 48px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 15px;
+    border-left: 1px solid #cbd5e1;
+    border-right: 1px solid #cbd5e1;
+    padding: 0 8px;
+    line-height: 38px;
+}
+
+/* ===== GIỮ NGUYÊN STYLE CŨ ===== */
 .page {
     background: #f5f7fb;
 }
 
-/* ✅ CONTAINER CHUẨN */
 .container {
     max-width: 1200px;
     margin: 0 auto;
@@ -385,7 +434,6 @@ const related = [
     font-family: sans-serif;
 }
 
-/* ===== DETAIL ===== */
 .detail {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -414,14 +462,16 @@ const related = [
     object-fit: cover;
     cursor: pointer;
     opacity: 0.7;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    transition: 0.2s;
 }
 
 .thumbs img.active {
-    border: 2px solid #2563eb;
+    border-color: #2563eb;
     opacity: 1;
 }
 
-/* RIGHT */
 .tag {
     background: #e2e8f0;
     padding: 4px 10px;
@@ -440,12 +490,21 @@ h1 {
     margin-bottom: 20px;
 }
 
-.old-price {
-    text-decoration: line-through;
-    color: #94a3b8;
+.variant-stock {
+    margin-top: -10px;
+    margin-bottom: 18px;
+    font-size: 14px;
 }
 
-/* 👉 CSS PHẦN BIẾN THỂ (Thêm mới) */
+.in-stock {
+    color: #16a34a;
+}
+
+.out-stock {
+    color: #dc2626;
+    font-weight: bold;
+}
+
 .product-options {
     margin-bottom: 25px;
 }
@@ -453,10 +512,11 @@ h1 {
 .option-group {
     display: flex;
     flex-direction: column;
+    margin-bottom: 14px;
 }
 
 .option-label {
-    margin: 0 0 5px;
+    margin: 0 0 8px;
     font-size: 14px;
     color: #334155;
     font-weight: bold;
@@ -466,7 +526,6 @@ h1 {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 5px;
 }
 
 .variant-item-btn {
@@ -480,40 +539,54 @@ h1 {
     color: #334155;
 }
 
-.variant-item-btn:hover:not(.disabled) {
+.variant-item-btn:hover {
     border-color: #2563eb;
     color: #2563eb;
 }
 
 .variant-item-btn.active {
     border-color: #2563eb;
-    background-color: #eff6ff;
+    background: #eff6ff;
     color: #2563eb;
     font-weight: bold;
     box-shadow: 0 0 0 1px #2563eb;
 }
 
-.variant-item-btn.disabled {
-    background: #f1f5f9;
-    color: #94a3b8;
-    cursor: not-allowed;
-    text-decoration: line-through;
-    border-style: dashed;
+.color-list {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
 }
 
-.stock-status {
-    margin-top: 10px;
-    font-size: 13px;
+.color-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background: transparent;
+    padding: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
-.in-stock { color: #16a34a; }
-.out-stock { color: #dc2626; font-weight: bold;}
-.disabled-btn { opacity: 0.5; cursor: not-allowed !important; }
-/* 👉 KẾT THÚC CSS BIẾN THỂ */
 
-/* BUTTON */
+.color-btn.active {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px #2563eb;
+}
+
+.color-dot {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+}
+
 .actions {
     display: flex;
     gap: 10px;
+    margin-bottom: 16px;
 }
 
 .add {
@@ -525,8 +598,18 @@ h1 {
     border-radius: 8px;
     cursor: pointer;
     transition: 0.2s;
+    font-size: 15px;
+    font-weight: 600;
 }
-.add:hover:not(.disabled-btn) { background: #1d4ed8; }
+
+.add:hover:not(.disabled-btn) {
+    background: #1d4ed8;
+}
+
+.disabled-btn {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+}
 
 .install {
     padding: 12px;
@@ -536,34 +619,13 @@ h1 {
     background: white;
 }
 
-/* ===== EXTRA ===== */
-.extra {
-    margin-top: 60px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 30px;
-}
-
-.spec-list div {
+.info {
     display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid #e2e8f0;
-    padding: 10px 0;
+    gap: 20px;
+    font-size: 13px;
+    color: #64748b;
 }
 
-.product-desc {
-    background: #eef2ff;
-    padding: 20px;
-    border-radius: 12px;
-}
-
-.features {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
-}
-
-/* ===== REVIEWS ===== */
 .reviews {
     margin-top: 60px;
 }
@@ -580,16 +642,8 @@ h1 {
     color: white;
     border: none;
     padding: 8px 16px;
-    height: auto;
-    width: auto;
-    display: inline-block;
     border-radius: 6px;
-    align-self: center;
     cursor: pointer;
-}
-
-.review-header button:hover {
-    background: #1e40af;
 }
 
 .review-list {
@@ -608,9 +662,9 @@ h1 {
     color: orange;
 }
 
-/* ===== RELATED ===== */
 .related {
-    margin-top: 60px;
+    padding: 0 150px;
+    margin-bottom: 60px;
 }
 
 .related-header {
@@ -620,24 +674,12 @@ h1 {
     margin-bottom: 20px;
 }
 
-.related-header h2 {
-    font-size: 20px;
-}
-
-.related-header a {
-    font-size: 13px;
-    color: #2563eb;
-    text-decoration: none;
-}
-
-/* LIST */
 .related-list {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 20px;
 }
 
-/* CARD */
 .product-card {
     background: #eef2ff;
     padding: 15px;
@@ -673,57 +715,19 @@ h1 {
     color: #64748b;
 }
 
-.price {
-    font-weight: bold;
-    margin-top: 6px;
-}
-
-.related {
-    padding: 0 150px;
-    margin-bottom: 60px;
-}
-.color-list {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 8px;
-}
-
-.color-btn {
-    width: 38px;
-    height: 38px;
-    border-radius: 999px;
-    border: 2px solid transparent;
-    background: transparent;
-    padding: 3px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.color-btn.active {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 1px #2563eb;
-}
-
-.color-dot {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border-radius: 999px;
-    border: 1px solid #cbd5e1;
-}
-.variant-stock {
-    margin-top: -10px;
-    margin-bottom: 18px;
-    font-size: 14px;
-}
-/* RESPONSIVE */
 @media (max-width: 768px) {
 
     .detail,
-    .extra,
     .review-list {
         grid-template-columns: 1fr;
+    }
+
+    .related {
+        padding: 0 16px;
+    }
+
+    .related-list {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 </style>

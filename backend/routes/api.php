@@ -14,10 +14,19 @@ use App\Http\Controllers\ColorController;
 use App\Http\Controllers\SanPhamController;
 use App\Http\Controllers\BienTheController;
 use App\Http\Controllers\BienTheHinhAnhController;
+use App\Http\Controllers\GioHangController;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/profile', [UserController::class, 'profile']);
     Route::put('/user/profile', [UserController::class, 'updateProfile']);
+
+    // ===== GIỎ HÀNG =====
+    Route::get('/gio-hang',                     [GioHangController::class, 'index']);
+    Route::post('/gio-hang/them',               [GioHangController::class, 'them']);
+    Route::put('/gio-hang/cap-nhat/{id}',       [GioHangController::class, 'capNhat']);
+    Route::delete('/gio-hang/xoa-tat',          [GioHangController::class, 'xoaTat']);
+    Route::delete('/gio-hang/xoa/{id}',         [GioHangController::class, 'xoa']);
+    Route::get('/gio-hang/dem',                 [GioHangController::class, 'demSoLuong']);
 });
 
 Route::get('/auth/google', [AuthController::class, 'redirectGoogle']);

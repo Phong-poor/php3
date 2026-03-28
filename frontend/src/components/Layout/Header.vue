@@ -2,12 +2,51 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import api from '../../services/api' // 👈 dùng api config có sẵn của bạn
 
 const router = useRouter()
 
 const showWishlist = ref(false)
 const showUser = ref(false)
 
+// ===================== GIỎ HÀNG BADGE =====================
+const cartCount = ref(0)
+
+const fetchCartCount = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    if (!token) { cartCount.value = 0; return }
+
+    const res = await api.get('/gio-hang/dem')
+    cartCount.value = res.data.count || 0
+  } catch {
+    cartCount.value = 0
+  }
+}
+
+// Lắng nghe event khi thêm vào giỏ hàng từ bất kỳ trang nào
+const handleCartUpdated = () => { fetchCartCount() }
+
+onMounted(() => {
+  fetchCartCount()
+  window.addEventListener('cart-updated', handleCartUpdated)
+
+  try {
+    const storedUser = localStorage.getItem('user')
+    user.value = storedUser ? JSON.parse(storedUser) : null
+  } catch {
+    user.value = null
+  }
+
+  document.addEventListener('click', handleOutside)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('cart-updated', handleCartUpdated)
+  document.removeEventListener('click', handleOutside)
+})
+
+// ===================== WISHLIST / USER DROPDOWN =====================
 const toggleWishlist = () => {
   showWishlist.value = !showWishlist.value
   if (showWishlist.value) showUser.value = false
@@ -15,14 +54,7 @@ const toggleWishlist = () => {
 
 const toggleUser = () => {
   const token = localStorage.getItem('token')
-
-  // chưa login → chuyển login
-  if (!token) {
-    router.push('/login')
-    return
-  }
-
-  // ✅ đã login → mở dropdown
+  if (!token) { router.push('/login'); return }
   showUser.value = !showUser.value
   if (showUser.value) showWishlist.value = false
 }
@@ -38,9 +70,8 @@ const handleOutside = (e) => {
     showUser.value = false
   }
 }
-onMounted(() => document.addEventListener('click', handleOutside))
-onUnmounted(() => document.removeEventListener('click', handleOutside))
 
+// ===================== WISHLIST =====================
 const wishlistItems = ref([
   { id: 1, name: 'VinaBook Pro X14', price: '36.990.000đ', img: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=200' },
   { id: 2, name: 'Zephyrus Titan 16', price: '62.990.000đ', img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=200' },
@@ -51,27 +82,20 @@ const removeWishlist = (id) => {
   wishlistItems.value = wishlistItems.value.filter(i => i.id !== id)
 }
 
+// ===================== USER =====================
 const user = ref(null)
-
-onMounted(() => {
-  try {
-    const storedUser = localStorage.getItem('user')
-    user.value = storedUser ? JSON.parse(storedUser) : null
-  } catch {
-    user.value = null
-  }
-})
 
 const handleLogout = async () => {
   showUser.value = false
   try {
     await axios.post('http://127.0.0.1:8000/api/logout')
-  } catch (err) {
+  } catch {
     console.log('Logout API lỗi (bỏ qua)')
   }
   localStorage.removeItem('user')
   localStorage.removeItem('token')
   localStorage.removeItem('remember_email')
+  cartCount.value = 0
   router.push('/login')
 }
 </script>
@@ -141,7 +165,7 @@ const handleLogout = async () => {
               <path
                 d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
-            <span class="badge badge-red">{{ wishlistItems.length }}</span>
+            <span class="badge badge-red" v-if="wishlistItems.length > 0">{{ wishlistItems.length }}</span>
           </button>
 
           <transition name="drop">
@@ -180,16 +204,18 @@ const handleLogout = async () => {
           </transition>
         </div>
 
-        <!-- CART -->
+        <!-- ===== CART (SỐ LƯỢNG THẬT TỪ API) ===== -->
         <div class="icon-btn-wrap">
-          <router-link to="/cart" class="icon-btn">
+          <router-link to="/cart" class="icon-btn" @click="fetchCartCount">
             <svg viewBox="0 0 24 24" fill="none">
               <path d="M6 6h15l-1.5 9h-13z" />
               <circle cx="9" cy="20" r="1" />
               <circle cx="18" cy="20" r="1" />
             </svg>
           </router-link>
-          <span class="badge badge-blue">3</span>
+          <span class="badge badge-blue" v-if="cartCount > 0">
+            {{ cartCount > 99 ? '99+' : cartCount }}
+          </span>
         </div>
 
         <!-- USER DROPDOWN -->
@@ -218,36 +244,18 @@ const handleLogout = async () => {
               <div class="drop-divider"></div>
 
               <div class="drop-footer-user">
-
-                <!-- ADMIN -->
                 <template v-if="user && user.role === 'admin'">
-                  <button class="admin-btn" @click="goAdmin">
-                    ⚙️ Quản trị
-                  </button>
-
-                  <button class="logout-btn" @click="handleLogout">
-                    Đăng xuất
-                  </button>
+                  <button class="admin-btn" @click="goAdmin">⚙️ Quản trị</button>
+                  <button class="logout-btn" @click="handleLogout">Đăng xuất</button>
                 </template>
-
-                <!-- USER -->
                 <template v-else>
-
-                  <!-- Xem thông tin -->
                   <router-link to="/profile" @click="showUser = false" class="profile-btn">
                     👤 Thông tin cá nhân
                   </router-link>
-
-                  <!-- Logout -->
-                  <button class="logout-btn" @click="handleLogout">
-                    Đăng xuất
-                  </button>
-
+                  <button class="logout-btn" @click="handleLogout">Đăng xuất</button>
                 </template>
-
               </div>
               <div class="drop-divider"></div>
-
             </div>
           </transition>
         </div>
@@ -326,13 +334,10 @@ const handleLogout = async () => {
   width: 100%;
   margin-bottom: 8px;
   padding: 10px;
-
   border-radius: 12px;
   border: 1px solid #2563eb;
-
   background: #eff6ff;
   color: #2563eb;
-
   font-weight: 600;
   cursor: pointer;
   transition: 0.2s;
@@ -363,7 +368,6 @@ const handleLogout = async () => {
   justify-content: space-between;
 }
 
-/* LOGO */
 .logo {
   font-size: 21px;
   font-weight: 800;
@@ -384,15 +388,12 @@ const handleLogout = async () => {
   width: 92%;
   margin-bottom: 8px;
   padding: 10px;
-
   border-radius: 12px;
   background: #bec0c1;
   color: #334155;
-
   font-weight: 500;
   text-align: left;
   text-decoration: none;
-
   transition: 0.2s;
 }
 
@@ -400,7 +401,6 @@ const handleLogout = async () => {
   background: #858788;
 }
 
-/* NAV */
 .nav {
   display: flex;
   gap: 28px;
@@ -437,14 +437,12 @@ const handleLogout = async () => {
   border-radius: 2px;
 }
 
-/* RIGHT */
 .right {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-/* SEARCH */
 .search {
   display: flex;
   align-items: center;
@@ -482,13 +480,11 @@ const handleLogout = async () => {
   stroke-width: 2;
 }
 
-/* ── ICON BTN WRAPPER ────────────────────────────────────── */
 .icon-btn-wrap {
   position: relative;
   display: inline-flex;
 }
 
-/* ── ICON BTN ────────────────────────────────────────────── */
 .icon-btn {
   width: 38px;
   height: 38px;
@@ -502,7 +498,6 @@ const handleLogout = async () => {
   text-decoration: none;
   border: none;
   position: relative;
-  /* needed for badge inside */
 }
 
 .icon-btn:hover {
@@ -523,7 +518,6 @@ const handleLogout = async () => {
   fill: none;
 }
 
-/* USER BUTTON */
 .icon-btn-user {
   background: #2563eb;
   padding: 0;
@@ -549,7 +543,6 @@ const handleLogout = async () => {
   display: block;
 }
 
-/* ── BADGE ───────────────────────────────────────────────── */
 .badge {
   position: absolute;
   top: -5px;
@@ -577,12 +570,10 @@ const handleLogout = async () => {
   background: #ef4444;
 }
 
-/* ── DROPDOWN WRAPPER ────────────────────────────────────── */
 .dropdown-wrap {
   position: relative;
 }
 
-/* ── DROPDOWN BASE ───────────────────────────────────────── */
 .dropdown {
   position: absolute;
   top: calc(100% + 12px);
@@ -609,7 +600,6 @@ const handleLogout = async () => {
   transform: rotate(45deg);
 }
 
-/* ── WISHLIST DROPDOWN ───────────────────────────────────── */
 .wishlist-drop {
   width: 320px;
 }
@@ -764,7 +754,6 @@ const handleLogout = async () => {
   transform: translateY(-1px);
 }
 
-/* ── USER DROPDOWN ───────────────────────────────────────── */
 .user-drop {
   width: 280px;
 }
@@ -821,72 +810,6 @@ const handleLogout = async () => {
   background: #f1f5f9;
 }
 
-.user-menu {
-  list-style: none;
-  padding: 6px 0;
-  margin: 0;
-}
-
-.user-menu li a {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 18px;
-  text-decoration: none;
-  color: #374151;
-  font-size: 13.5px;
-  font-weight: 500;
-  transition: background 0.15s, color 0.15s;
-}
-
-.user-menu li a:hover {
-  background: #f8fafc;
-  color: #2563eb;
-}
-
-.user-menu li a:hover .menu-icon {
-  background: #dbeafe;
-}
-
-.user-menu li a:hover .menu-icon svg {
-  stroke: #2563eb;
-}
-
-.menu-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: #f1f5f9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
-.menu-icon svg {
-  width: 16px;
-  height: 16px;
-  stroke: #64748b;
-  stroke-width: 1.8;
-  fill: none;
-  transition: stroke 0.15s;
-}
-
-.menu-arrow {
-  width: 14px;
-  height: 14px;
-  stroke: #cbd5e1;
-  stroke-width: 2;
-  fill: none;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.user-menu li a:hover .menu-arrow {
-  stroke: #2563eb;
-}
-
 .drop-footer-user {
   padding: 12px 18px;
 }
@@ -914,7 +837,6 @@ const handleLogout = async () => {
   transform: translateY(-1px);
 }
 
-/* ── TRANSITION ──────────────────────────────────────────── */
 .drop-enter-active {
   transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
