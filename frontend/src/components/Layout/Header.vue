@@ -197,7 +197,7 @@ const handleLogout = async () => {
                   </svg>
                   <p>Chưa có sản phẩm yêu thích</p>
                 </div>
-                <div class="wish-item" v-for="item in wishlistItems" :key="item.id">
+                <div class="wish-item" v-for="item in recentWishlist" :key="item.id">
                   <img :src="item.img" :alt="item.name" />
                   <div class="wish-info">
                     <p class="wish-name">{{ item.name }}</p>
@@ -211,7 +211,7 @@ const handleLogout = async () => {
                 </div>
               </div>
               <div class="drop-footer" v-if="wishlistItems.length > 0">
-                <router-link to="/products" class="drop-action-btn" @click="showWishlist = false">
+                <router-link to="/wishlistpage" class="drop-action-btn" @click="showWishlist = false">
                   Xem tất cả
                 </router-link>
               </div>
