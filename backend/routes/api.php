@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DatHangController;
 
 use App\Http\Controllers\UserController;
 
@@ -14,10 +15,23 @@ use App\Http\Controllers\ColorController;
 use App\Http\Controllers\SanPhamController;
 use App\Http\Controllers\BienTheController;
 use App\Http\Controllers\BienTheHinhAnhController;
+use App\Http\Controllers\GioHangController;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user/profile', [UserController::class, 'profile']);
     Route::put('/user/profile', [UserController::class, 'updateProfile']);
+
+    // ===== GIỎ HÀNG =====
+    Route::get('/gio-hang',                     [GioHangController::class, 'index']);
+    Route::post('/gio-hang/them',               [GioHangController::class, 'them']);
+    Route::put('/gio-hang/cap-nhat/{id}',       [GioHangController::class, 'capNhat']);
+    Route::delete('/gio-hang/xoa-tat',          [GioHangController::class, 'xoaTat']);
+    Route::delete('/gio-hang/xoa/{id}',         [GioHangController::class, 'xoa']);
+    Route::get('/gio-hang/dem',                 [GioHangController::class, 'demSoLuong']);
+
+    // ===== ĐẶT HÀNG =====
+    Route::post('/checkout',                    [DatHangController::class, 'checkout']);
+    Route::get('/orders',                       [DatHangController::class, 'orders']);
 });
 
 Route::get('/auth/google', [AuthController::class, 'redirectGoogle']);
@@ -111,4 +125,8 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::post('/users', [UserController::class, 'store']);
         Route::put('/users/{id}', [UserController::class, 'update']);
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
+
+        // ===== ADMIN ORDERS =====
+        Route::get('/orders', [DatHangController::class, 'allOrders']);
+        Route::put('/orders/{id}/status', [DatHangController::class, 'updateStatus']);
     });
