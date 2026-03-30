@@ -17,6 +17,7 @@ import Orderspage from '../components/Web/Orderspage.vue'
 import Addresspage from '../components/Web/Addresspage.vue'
 import Passwordpage from '../components/Web/Passwordpage.vue'
 import LoginSuccess from '../components/Web/LoginSuccess.vue'
+import WishlistPage from '../components/Web/WishlistPage.vue'
 
 // ── Auth ──
 import Login from '../components/Auth/Login.vue'
@@ -47,6 +48,7 @@ const routes = [
       { path: 'orderspage', component: Orderspage },
       { path: 'addresspage', component: Addresspage },
       { path: 'passwordpage', component: Passwordpage },
+      { path: 'wishlistpage', component: WishlistPage },
     ],
   },
 
@@ -78,6 +80,7 @@ const routes = [
       { path: 'promotions', component: () => import('../components/Admin/Promotions.vue') },
       { path: 'contacts', component: () => import('../components/Admin/Contact.vue') },
       { path: 'brands', component: () => import('../components/Admin/Brands.vue') },
+      { path: 'reviews' , component: () => import('../components/Admin/ReviewManagement.vue')},
     ],
   },
 
